@@ -31,11 +31,17 @@ func main() {
 	userRepository := repositories.NewUserRepository(dbPool)
 	userService := services.NewUserService(userRepository, cfg.JWTSecret)
 	authHandler := handlers.NewAuthHandler(userService)
+	conversationRepository := repositories.NewConversationRepository(dbPool)
+	conversationService := services.NewConversationService(conversationRepository)
+	conversationHandler := handlers.NewConversationHandler(conversationService)
+	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
 	router.GET("/health", handlers.Health)
 	router.POST("/auth/register", authHandler.Register)
 	router.POST("/auth/login", authHandler.Login)
-	router.GET("/auth/me", middleware.Auth(cfg.JWTSecret), authHandler.Me)
+	router.GET("/auth/me", authMiddleware, authHandler.Me)
+	router.GET("/conversations", authMiddleware, conversationHandler.List)
+	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)
