@@ -43,3 +43,20 @@ func (h *Hub) Unsubscribe(conversationID uuid.UUID, conn *websocket.Conn) {
 		delete(h.conversations, conversationID)
 	}
 }
+
+func (h *Hub) Broadcast(conversationID uuid.UUID, event Event) {
+	h.mu.RLock()
+	connections := h.conversations[conversationID]
+	targets := make([]*websocket.Conn, 0, len(connections))
+	for conn := range connections {
+		targets = append(targets, conn)
+	}
+	h.mu.RUnlock()
+
+	for _, conn := range targets {
+		if err := conn.WriteJSON(event); err != nil {
+			conn.Close()
+			h.Unsubscribe(conversationID, conn)
+		}
+	}
+}

@@ -37,8 +37,8 @@ func main() {
 	conversationHandler := handlers.NewConversationHandler(conversationService)
 	messageRepository := repositories.NewMessageRepository(dbPool)
 	messageService := services.NewMessageService(messageRepository, conversationRepository)
-	messageHandler := handlers.NewMessageHandler(messageService)
 	realtimeHub := realtime.NewHub()
+	messageHandler := handlers.NewMessageHandler(messageService, realtimeHub)
 	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, cfg.JWTSecret)
 	authMiddleware := middleware.Auth(cfg.JWTSecret)
 

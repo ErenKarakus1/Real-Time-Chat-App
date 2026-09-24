@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,15 +20,17 @@ type MessageService interface {
 
 type MessageHandler struct {
 	messages MessageService
+	hub      *realtime.Hub
 }
 
 type createMessageRequest struct {
 	Content string `json:"content"`
 }
 
-func NewMessageHandler(messages MessageService) *MessageHandler {
+func NewMessageHandler(messages MessageService, hub *realtime.Hub) *MessageHandler {
 	return &MessageHandler{
 		messages: messages,
+		hub:      hub,
 	}
 }
 
@@ -68,7 +71,13 @@ func (h *MessageHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, models.NewMessageResponse(message))
+	response := models.NewMessageResponse(message)
+	h.hub.Broadcast(conversationID, realtime.Event{
+		Type: realtime.EventMessageCreated,
+		Data: response,
+	})
+
+	c.JSON(http.StatusCreated, response)
 }
 
 func (h *MessageHandler) List(c *gin.Context) {
