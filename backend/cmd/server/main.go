@@ -8,6 +8,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/db"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/handlers"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/repositories"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,8 @@ func main() {
 	messageRepository := repositories.NewMessageRepository(dbPool)
 	messageService := services.NewMessageService(messageRepository, conversationRepository)
 	messageHandler := handlers.NewMessageHandler(messageService)
+	realtimeHub := realtime.NewHub()
+	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, cfg.JWTSecret)
 	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
 	router.GET("/health", handlers.Health)
@@ -48,6 +51,7 @@ func main() {
 	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
 	router.GET("/conversations/:conversation_id/messages", authMiddleware, messageHandler.List)
 	router.POST("/conversations/:conversation_id/messages", authMiddleware, messageHandler.Create)
+	router.GET("/ws/conversations/:conversation_id", webSocketHandler.Conversation)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)
