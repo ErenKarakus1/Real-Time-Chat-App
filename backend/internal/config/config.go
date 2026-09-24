@@ -7,16 +7,18 @@ import (
 )
 
 type Config struct {
-	Port    string
-	GinMode string
+	Port        string
+	GinMode     string
+	DatabaseURL string
 }
 
 func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:    getEnv("PORT", "8080"),
-		GinMode: getEnv("GIN_MODE", "debug"),
+		Port:        getEnv("PORT", "8080"),
+		GinMode:     getEnv("GIN_MODE", "debug"),
+		DatabaseURL: getEnv("DATABASE_URL", ""),
 	}
 }
 
