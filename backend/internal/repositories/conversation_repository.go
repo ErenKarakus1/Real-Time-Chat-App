@@ -144,6 +144,24 @@ func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UU
 	return conversations, nil
 }
 
+func (r *ConversationRepository) IsParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM conversation_participants
+			WHERE conversation_id = $1
+				AND user_id = $2
+		)
+	`
+
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, conversationID, userID).Scan(&exists); err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 func scanConversation(row pgx.Row) (models.Conversation, error) {
 	var conversation models.Conversation
 
