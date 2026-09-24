@@ -15,6 +15,9 @@ import (
 func main() {
 	cfg := config.Load()
 	gin.SetMode(cfg.GinMode)
+	if cfg.JWTSecret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
 
 	ctx := context.Background()
 	dbPool, err := db.Connect(ctx, cfg.DatabaseURL)
@@ -25,11 +28,12 @@ func main() {
 
 	router := gin.Default()
 	userRepository := repositories.NewUserRepository(dbPool)
-	userService := services.NewUserService(userRepository)
+	userService := services.NewUserService(userRepository, cfg.JWTSecret)
 	authHandler := handlers.NewAuthHandler(userService)
 
 	router.GET("/health", handlers.Health)
 	router.POST("/auth/register", authHandler.Register)
+	router.POST("/auth/login", authHandler.Login)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)

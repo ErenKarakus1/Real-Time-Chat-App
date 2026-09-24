@@ -12,6 +12,7 @@ import (
 
 type UserService interface {
 	Register(ctx context.Context, input services.RegisterUserInput) (models.User, error)
+	Login(ctx context.Context, input services.LoginInput) (services.LoginResult, error)
 }
 
 type AuthHandler struct {
@@ -22,6 +23,16 @@ type registerRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type loginResponse struct {
+	User  models.UserResponse `json:"user"`
+	Token string              `json:"token"`
 }
 
 func NewAuthHandler(users UserService) *AuthHandler {
@@ -55,6 +66,33 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, models.NewUserResponse(user))
 }
 
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if validationError := validateLoginRequest(req); validationError != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
+		return
+	}
+
+	result, err := h.users.Login(c, services.LoginInput{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, loginResponse{
+		User:  models.NewUserResponse(result.User),
+		Token: result.Token,
+	})
+}
+
 func validateRegisterRequest(req registerRequest) string {
 	username := strings.TrimSpace(req.Username)
 	email := strings.TrimSpace(req.Email)
@@ -81,6 +119,24 @@ func validateRegisterRequest(req registerRequest) string {
 
 	if len(req.Password) < 8 {
 		return "password must be at least 8 characters"
+	}
+
+	return ""
+}
+
+func validateLoginRequest(req loginRequest) string {
+	email := strings.TrimSpace(req.Email)
+
+	if email == "" {
+		return "email is required"
+	}
+
+	if !strings.Contains(email, "@") {
+		return "email must be valid"
+	}
+
+	if req.Password == "" {
+		return "password is required"
 	}
 
 	return ""
