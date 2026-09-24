@@ -42,6 +42,7 @@ func main() {
 	router.GET("/auth/me", authMiddleware, authHandler.Me)
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
 	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
+	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)

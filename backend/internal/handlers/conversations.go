@@ -13,6 +13,7 @@ import (
 )
 
 type ConversationService interface {
+	CreateDirect(ctx context.Context, input services.CreateDirectInput) (models.Conversation, error)
 	CreateRoom(ctx context.Context, input services.CreateRoomInput) (models.Conversation, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 }
@@ -23,6 +24,10 @@ type ConversationHandler struct {
 
 type createRoomRequest struct {
 	Name string `json:"name"`
+}
+
+type createDirectRequest struct {
+	OtherUserID string `json:"other_user_id"`
 }
 
 func NewConversationHandler(conversations ConversationService) *ConversationHandler {
@@ -54,6 +59,41 @@ func (h *ConversationHandler) CreateRoom(c *gin.Context) {
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create room"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.NewConversationResponse(conversation))
+}
+
+func (h *ConversationHandler) CreateDirect(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	var req createDirectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	otherUserID, err := uuid.Parse(req.OtherUserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "other_user_id must be a valid UUID"})
+		return
+	}
+
+	conversation, err := h.conversations.CreateDirect(c, services.CreateDirectInput{
+		UserID:      userID,
+		OtherUserID: otherUserID,
+	})
+	if errors.Is(err, services.ErrInvalidDirectConversation) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create direct conversation"})
 		return
 	}
 
