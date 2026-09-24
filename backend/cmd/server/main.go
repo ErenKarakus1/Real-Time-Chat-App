@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"log"
+
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/config"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/db"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/handlers"
 	"github.com/gin-gonic/gin"
 )
@@ -9,6 +13,13 @@ import (
 func main() {
 	cfg := config.Load()
 	gin.SetMode(cfg.GinMode)
+
+	ctx := context.Background()
+	dbPool, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("connect database: %v", err)
+	}
+	defer dbPool.Close()
 
 	router := gin.Default()
 
