@@ -68,10 +68,12 @@ func (h *WebSocketHandler) Conversation(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
 
-	h.hub.Subscribe(conversationID, conn)
-	defer h.hub.Unsubscribe(conversationID, conn)
+	client := realtime.NewClient(conn)
+	h.hub.Subscribe(conversationID, client)
+	defer h.hub.Unsubscribe(conversationID, client)
+
+	go client.WritePump()
 
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {

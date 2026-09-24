@@ -4,59 +4,63 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 )
 
 type Hub struct {
 	mu            sync.RWMutex
-	conversations map[uuid.UUID]map[*websocket.Conn]struct{}
+	conversations map[uuid.UUID]map[*Client]struct{}
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		conversations: make(map[uuid.UUID]map[*websocket.Conn]struct{}),
+		conversations: make(map[uuid.UUID]map[*Client]struct{}),
 	}
 }
 
-func (h *Hub) Subscribe(conversationID uuid.UUID, conn *websocket.Conn) {
+func (h *Hub) Subscribe(conversationID uuid.UUID, client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if h.conversations[conversationID] == nil {
-		h.conversations[conversationID] = make(map[*websocket.Conn]struct{})
+		h.conversations[conversationID] = make(map[*Client]struct{})
 	}
 
-	h.conversations[conversationID][conn] = struct{}{}
+	h.conversations[conversationID][client] = struct{}{}
 }
 
-func (h *Hub) Unsubscribe(conversationID uuid.UUID, conn *websocket.Conn) {
+func (h *Hub) Unsubscribe(conversationID uuid.UUID, client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	connections := h.conversations[conversationID]
-	if connections == nil {
+	clients := h.conversations[conversationID]
+	if clients == nil {
 		return
 	}
 
-	delete(connections, conn)
-	if len(connections) == 0 {
+	if _, exists := clients[client]; exists {
+		delete(clients, client)
+		client.Close()
+	}
+
+	if len(clients) == 0 {
 		delete(h.conversations, conversationID)
 	}
 }
 
 func (h *Hub) Broadcast(conversationID uuid.UUID, event Event) {
 	h.mu.RLock()
-	connections := h.conversations[conversationID]
-	targets := make([]*websocket.Conn, 0, len(connections))
-	for conn := range connections {
-		targets = append(targets, conn)
+	clients := h.conversations[conversationID]
+	targets := make([]*Client, 0, len(clients))
+	for client := range clients {
+		targets = append(targets, client)
 	}
 	h.mu.RUnlock()
 
-	for _, conn := range targets {
-		if err := conn.WriteJSON(event); err != nil {
-			conn.Close()
-			h.Unsubscribe(conversationID, conn)
+	for _, client := range targets {
+		select {
+		case client.send <- event:
+		default:
+			h.Unsubscribe(conversationID, client)
 		}
 	}
 }
