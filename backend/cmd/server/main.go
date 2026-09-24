@@ -34,6 +34,9 @@ func main() {
 	conversationRepository := repositories.NewConversationRepository(dbPool)
 	conversationService := services.NewConversationService(conversationRepository)
 	conversationHandler := handlers.NewConversationHandler(conversationService)
+	messageRepository := repositories.NewMessageRepository(dbPool)
+	messageService := services.NewMessageService(messageRepository, conversationRepository)
+	messageHandler := handlers.NewMessageHandler(messageService)
 	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
 	router.GET("/health", handlers.Health)
@@ -43,6 +46,8 @@ func main() {
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
 	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
 	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
+	router.GET("/conversations/:conversation_id/messages", authMiddleware, messageHandler.List)
+	router.POST("/conversations/:conversation_id/messages", authMiddleware, messageHandler.Create)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)
