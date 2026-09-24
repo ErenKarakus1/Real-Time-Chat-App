@@ -1,6 +1,6 @@
 module github.com/ErenKarakus1/Real-Time-Chat-App
 
-go 1.26
+go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.10.1
