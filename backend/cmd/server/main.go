@@ -7,6 +7,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/config"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/db"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/handlers"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/repositories"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,7 @@ func main() {
 	router.GET("/health", handlers.Health)
 	router.POST("/auth/register", authHandler.Register)
 	router.POST("/auth/login", authHandler.Login)
+	router.GET("/auth/me", middleware.Auth(cfg.JWTSecret), authHandler.Me)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		panic(err)

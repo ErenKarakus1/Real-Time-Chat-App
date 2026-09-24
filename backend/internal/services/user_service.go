@@ -12,6 +12,7 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user models.User) (models.User, error)
+	FindByID(ctx context.Context, id uuid.UUID) (models.User, error)
 	FindByEmail(ctx context.Context, email string) (models.User, error)
 }
 
@@ -81,4 +82,8 @@ func (s *UserService) Login(ctx context.Context, input LoginInput) (LoginResult,
 		User:  user,
 		Token: token,
 	}, nil
+}
+
+func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (models.User, error) {
+	return s.users.FindByID(ctx, id)
 }

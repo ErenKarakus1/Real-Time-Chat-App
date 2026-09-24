@@ -5,14 +5,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type UserService interface {
 	Register(ctx context.Context, input services.RegisterUserInput) (models.User, error)
 	Login(ctx context.Context, input services.LoginInput) (services.LoginResult, error)
+	FindByID(ctx context.Context, id uuid.UUID) (models.User, error)
 }
 
 type AuthHandler struct {
@@ -91,6 +94,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		User:  models.NewUserResponse(result.User),
 		Token: result.Token,
 	})
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userIDValue, exists := c.Get(middleware.ContextUserID)
+	userIDString, ok := userIDValue.(string)
+	if !exists || !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDString)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is invalid"})
+		return
+	}
+
+	user, err := h.users.FindByID(c, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewUserResponse(user))
 }
 
 func validateRegisterRequest(req registerRequest) string {
