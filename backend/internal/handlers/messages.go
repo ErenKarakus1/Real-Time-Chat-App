@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
@@ -102,9 +103,16 @@ func (h *MessageHandler) List(c *gin.Context) {
 		return
 	}
 
+	before, ok := beforeQuery(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "before must be an RFC3339 timestamp"})
+		return
+	}
+
 	messages, err := h.messages.ListForConversation(c, services.ListMessagesInput{
 		ConversationID: conversationID,
 		UserID:         userID,
+		Before:         before,
 		Limit:          limit,
 	})
 	if errors.Is(err, services.ErrConversationAccessDenied) {
@@ -136,4 +144,18 @@ func limitQuery(c *gin.Context) (int, bool) {
 	}
 
 	return limit, true
+}
+
+func beforeQuery(c *gin.Context) (*time.Time, bool) {
+	value := c.Query("before")
+	if value == "" {
+		return nil, true
+	}
+
+	before, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, false
+	}
+
+	return &before, true
 }

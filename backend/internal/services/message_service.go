@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
 	"github.com/google/uuid"
@@ -19,7 +20,7 @@ var ErrInvalidMessageContent = errors.New("message content is required")
 
 type MessageRepository interface {
 	Create(ctx context.Context, message models.Message) (models.Message, error)
-	ListForConversation(ctx context.Context, conversationID uuid.UUID, limit int) ([]models.Message, error)
+	ListForConversation(ctx context.Context, conversationID uuid.UUID, before *time.Time, limit int) ([]models.Message, error)
 }
 
 type MessageConversationRepository interface {
@@ -40,6 +41,7 @@ type CreateMessageInput struct {
 type ListMessagesInput struct {
 	ConversationID uuid.UUID
 	UserID         uuid.UUID
+	Before         *time.Time
 	Limit          int
 }
 
@@ -83,7 +85,7 @@ func (s *MessageService) ListForConversation(ctx context.Context, input ListMess
 		limit = DefaultMessageLimit
 	}
 
-	return s.messages.ListForConversation(ctx, input.ConversationID, limit)
+	return s.messages.ListForConversation(ctx, input.ConversationID, input.Before, limit)
 }
 
 func (s *MessageService) ensureParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error {

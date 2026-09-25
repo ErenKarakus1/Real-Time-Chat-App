@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"time"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
 	"github.com/google/uuid"
@@ -31,7 +32,7 @@ func (r *MessageRepository) Create(ctx context.Context, message models.Message) 
 	return scanMessage(r.db.QueryRow(ctx, query, message.ID, message.ConversationID, message.SenderID, message.Content))
 }
 
-func (r *MessageRepository) ListForConversation(ctx context.Context, conversationID uuid.UUID, limit int) ([]models.Message, error) {
+func (r *MessageRepository) ListForConversation(ctx context.Context, conversationID uuid.UUID, before *time.Time, limit int) ([]models.Message, error) {
 	if limit <= 0 {
 		limit = DefaultMessageLimit
 	}
@@ -40,11 +41,12 @@ func (r *MessageRepository) ListForConversation(ctx context.Context, conversatio
 		SELECT id, conversation_id, sender_id, content, created_at, updated_at
 		FROM messages
 		WHERE conversation_id = $1
+			AND ($2::timestamptz IS NULL OR created_at < $2)
 		ORDER BY created_at DESC
-		LIMIT $2
+		LIMIT $3
 	`
 
-	rows, err := r.db.Query(ctx, query, conversationID, limit)
+	rows, err := r.db.Query(ctx, query, conversationID, before, limit)
 	if err != nil {
 		return nil, err
 	}
