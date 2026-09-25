@@ -19,6 +19,7 @@ var ErrInvalidRoomName = errors.New("room name must be between 3 and 80 characte
 var ErrInvalidDirectConversation = errors.New("direct conversation requires two different users")
 var ErrConversationManagementDenied = errors.New("user cannot manage this conversation")
 var ErrInvalidParticipant = errors.New("participant must be a different user")
+var ErrInvalidParticipantRole = errors.New("participant role must be admin or member")
 
 type ConversationRepository interface {
 	AddParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
@@ -30,6 +31,7 @@ type ConversationRepository interface {
 	IsParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (bool, error)
 	ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 }
 
 type ConversationService struct {
@@ -55,6 +57,13 @@ type AddRoomParticipantInput struct {
 type ListParticipantsInput struct {
 	ConversationID uuid.UUID
 	UserID         uuid.UUID
+}
+
+type UpdateParticipantRoleInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
+	UserID         uuid.UUID
+	Role           models.ParticipantRole
 }
 
 func NewConversationService(conversations ConversationRepository) *ConversationService {
@@ -141,4 +150,34 @@ func (s *ConversationService) ListParticipants(ctx context.Context, input ListPa
 	}
 
 	return s.conversations.ListParticipants(ctx, input.ConversationID)
+}
+
+func (s *ConversationService) UpdateParticipantRole(ctx context.Context, input UpdateParticipantRoleInput) (models.ConversationParticipant, error) {
+	if input.UserID == uuid.Nil || input.ActorID == uuid.Nil || input.UserID == input.ActorID {
+		return models.ConversationParticipant{}, ErrInvalidParticipant
+	}
+
+	if input.Role != models.ParticipantRoleAdmin && input.Role != models.ParticipantRoleMember {
+		return models.ConversationParticipant{}, ErrInvalidParticipantRole
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	target, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.UserID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if target.Role == models.ParticipantRoleOwner {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	return s.conversations.UpdateParticipantRole(ctx, input.ConversationID, input.UserID, input.Role)
 }

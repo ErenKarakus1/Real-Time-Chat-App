@@ -226,6 +226,18 @@ func (r *ConversationRepository) AddParticipant(ctx context.Context, conversatio
 	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
 }
 
+func (r *ConversationRepository) UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error) {
+	query := `
+		UPDATE conversation_participants
+		SET role = $3
+		WHERE conversation_id = $1
+			AND user_id = $2
+		RETURNING conversation_id, user_id, role, joined_at
+	`
+
+	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
+}
+
 func scanConversation(row pgx.Row) (models.Conversation, error) {
 	var conversation models.Conversation
 
