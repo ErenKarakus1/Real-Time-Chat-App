@@ -28,6 +28,12 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	redisClient, err := db.ConnectRedis(ctx, cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("connect redis: %v", err)
+	}
+	defer redisClient.Close()
+
 	router := gin.Default()
 	userRepository := repositories.NewUserRepository(dbPool)
 	userService := services.NewUserService(userRepository, cfg.JWTSecret)
