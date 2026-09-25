@@ -23,13 +23,37 @@ func NewMessageRepository(db *pgxpool.Pool) *MessageRepository {
 }
 
 func (r *MessageRepository) Create(ctx context.Context, message models.Message) (models.Message, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return models.Message{}, err
+	}
+	defer tx.Rollback(ctx)
+
 	query := `
 		INSERT INTO messages (id, conversation_id, sender_id, content)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, conversation_id, sender_id, content, created_at, updated_at
 	`
 
-	return scanMessage(r.db.QueryRow(ctx, query, message.ID, message.ConversationID, message.SenderID, message.Content))
+	created, err := scanMessage(tx.QueryRow(ctx, query, message.ID, message.ConversationID, message.SenderID, message.Content))
+	if err != nil {
+		return models.Message{}, err
+	}
+
+	updateConversationQuery := `
+		UPDATE conversations
+		SET updated_at = $1
+		WHERE id = $2
+	`
+	if _, err := tx.Exec(ctx, updateConversationQuery, created.CreatedAt, created.ConversationID); err != nil {
+		return models.Message{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return models.Message{}, err
+	}
+
+	return created, nil
 }
 
 func (r *MessageRepository) ListForConversation(ctx context.Context, conversationID uuid.UUID, before *time.Time, limit int) ([]models.Message, error) {
