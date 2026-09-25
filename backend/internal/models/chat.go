@@ -7,10 +7,17 @@ import (
 )
 
 type ConversationType string
+type ParticipantRole string
 
 const (
 	ConversationTypeRoom   ConversationType = "room"
 	ConversationTypeDirect ConversationType = "direct"
+)
+
+const (
+	ParticipantRoleOwner  ParticipantRole = "owner"
+	ParticipantRoleAdmin  ParticipantRole = "admin"
+	ParticipantRoleMember ParticipantRole = "member"
 )
 
 type User struct {
@@ -32,9 +39,10 @@ type Conversation struct {
 }
 
 type ConversationParticipant struct {
-	ConversationID uuid.UUID `json:"conversation_id"`
-	UserID         uuid.UUID `json:"user_id"`
-	JoinedAt       time.Time `json:"joined_at"`
+	ConversationID uuid.UUID       `json:"conversation_id"`
+	UserID         uuid.UUID       `json:"user_id"`
+	Role           ParticipantRole `json:"role"`
+	JoinedAt       time.Time       `json:"joined_at"`
 }
 
 type Message struct {

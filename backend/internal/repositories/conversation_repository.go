@@ -45,10 +45,10 @@ func (r *ConversationRepository) CreateRoom(ctx context.Context, conversation mo
 	}
 
 	participantQuery := `
-		INSERT INTO conversation_participants (conversation_id, user_id)
-		VALUES ($1, $2)
+		INSERT INTO conversation_participants (conversation_id, user_id, role)
+		VALUES ($1, $2, $3)
 	`
-	if _, err := tx.Exec(ctx, participantQuery, created.ID, creatorID); err != nil {
+	if _, err := tx.Exec(ctx, participantQuery, created.ID, creatorID, models.ParticipantRoleOwner); err != nil {
 		return models.Conversation{}, err
 	}
 
@@ -84,10 +84,10 @@ func (r *ConversationRepository) CreateDirect(ctx context.Context, conversation 
 	}
 
 	participantQuery := `
-		INSERT INTO conversation_participants (conversation_id, user_id)
-		VALUES ($1, $2), ($1, $3)
+		INSERT INTO conversation_participants (conversation_id, user_id, role)
+		VALUES ($1, $2, $4), ($1, $3, $4)
 	`
-	if _, err := tx.Exec(ctx, participantQuery, created.ID, userID, otherUserID); err != nil {
+	if _, err := tx.Exec(ctx, participantQuery, created.ID, userID, otherUserID, models.ParticipantRoleMember); err != nil {
 		return models.Conversation{}, err
 	}
 
