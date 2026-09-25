@@ -12,6 +12,7 @@ import (
 
 const (
 	DefaultMessageLimit = 50
+	MaxMessageLimit     = 100
 	MaxMessageLength    = 2000
 )
 
@@ -83,6 +84,9 @@ func (s *MessageService) ListForConversation(ctx context.Context, input ListMess
 	limit := input.Limit
 	if limit <= 0 {
 		limit = DefaultMessageLimit
+	}
+	if limit > MaxMessageLimit {
+		limit = MaxMessageLimit
 	}
 
 	return s.messages.ListForConversation(ctx, input.ConversationID, input.Before, limit)
