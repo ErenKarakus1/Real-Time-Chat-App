@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const DefaultMessageLimit = 50
+const (
+	DefaultMessageLimit = 50
+	MaxMessageLength    = 2000
+)
 
 var ErrConversationAccessDenied = errors.New("user is not a participant in this conversation")
 var ErrInvalidMessageContent = errors.New("message content is required")
@@ -54,6 +57,9 @@ func (s *MessageService) Create(ctx context.Context, input CreateMessageInput) (
 
 	content := strings.TrimSpace(input.Content)
 	if content == "" {
+		return models.Message{}, ErrInvalidMessageContent
+	}
+	if len(content) > MaxMessageLength {
 		return models.Message{}, ErrInvalidMessageContent
 	}
 
