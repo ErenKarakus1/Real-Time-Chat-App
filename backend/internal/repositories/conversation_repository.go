@@ -112,6 +112,16 @@ func (r *ConversationRepository) FindDirectBetweenUsers(ctx context.Context, use
 	return scanConversation(r.db.QueryRow(ctx, query, models.ConversationTypeDirect, userID, otherUserID))
 }
 
+func (r *ConversationRepository) FindByID(ctx context.Context, conversationID uuid.UUID) (models.Conversation, error) {
+	query := `
+		SELECT id, type, name, created_by, created_at, updated_at
+		FROM conversations
+		WHERE id = $1
+	`
+
+	return scanConversation(r.db.QueryRow(ctx, query, conversationID))
+}
+
 func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
 	query := `
 		SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
@@ -162,6 +172,29 @@ func (r *ConversationRepository) IsParticipant(ctx context.Context, conversation
 	return exists, nil
 }
 
+func (r *ConversationRepository) FindParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error) {
+	query := `
+		SELECT conversation_id, user_id, role, joined_at
+		FROM conversation_participants
+		WHERE conversation_id = $1
+			AND user_id = $2
+	`
+
+	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID))
+}
+
+func (r *ConversationRepository) AddParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error) {
+	query := `
+		INSERT INTO conversation_participants (conversation_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (conversation_id, user_id) DO UPDATE
+		SET role = conversation_participants.role
+		RETURNING conversation_id, user_id, role, joined_at
+	`
+
+	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
+}
+
 func scanConversation(row pgx.Row) (models.Conversation, error) {
 	var conversation models.Conversation
 
@@ -175,4 +208,17 @@ func scanConversation(row pgx.Row) (models.Conversation, error) {
 	)
 
 	return conversation, err
+}
+
+func scanConversationParticipant(row pgx.Row) (models.ConversationParticipant, error) {
+	var participant models.ConversationParticipant
+
+	err := row.Scan(
+		&participant.ConversationID,
+		&participant.UserID,
+		&participant.Role,
+		&participant.JoinedAt,
+	)
+
+	return participant, err
 }

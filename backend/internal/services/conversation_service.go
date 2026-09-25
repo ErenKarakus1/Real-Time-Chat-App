@@ -17,11 +17,16 @@ const (
 
 var ErrInvalidRoomName = errors.New("room name must be between 3 and 80 characters")
 var ErrInvalidDirectConversation = errors.New("direct conversation requires two different users")
+var ErrConversationManagementDenied = errors.New("user cannot manage this conversation")
+var ErrInvalidParticipant = errors.New("participant must be a different user")
 
 type ConversationRepository interface {
+	AddParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 	CreateDirect(ctx context.Context, conversation models.Conversation, userID uuid.UUID, otherUserID uuid.UUID) (models.Conversation, error)
 	CreateRoom(ctx context.Context, conversation models.Conversation, creatorID uuid.UUID) (models.Conversation, error)
+	FindByID(ctx context.Context, conversationID uuid.UUID) (models.Conversation, error)
 	FindDirectBetweenUsers(ctx context.Context, userID uuid.UUID, otherUserID uuid.UUID) (models.Conversation, error)
+	FindParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 }
 
@@ -37,6 +42,12 @@ type CreateRoomInput struct {
 type CreateDirectInput struct {
 	UserID      uuid.UUID
 	OtherUserID uuid.UUID
+}
+
+type AddRoomParticipantInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
+	UserID         uuid.UUID
 }
 
 func NewConversationService(conversations ConversationRepository) *ConversationService {
@@ -84,4 +95,30 @@ func (s *ConversationService) CreateDirect(ctx context.Context, input CreateDire
 
 func (s *ConversationService) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
 	return s.conversations.ListForUser(ctx, userID)
+}
+
+func (s *ConversationService) AddRoomParticipant(ctx context.Context, input AddRoomParticipantInput) (models.ConversationParticipant, error) {
+	if input.UserID == uuid.Nil || input.ActorID == uuid.Nil || input.UserID == input.ActorID {
+		return models.ConversationParticipant{}, ErrInvalidParticipant
+	}
+
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner && actor.Role != models.ParticipantRoleAdmin {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	return s.conversations.AddParticipant(ctx, input.ConversationID, input.UserID, models.ParticipantRoleMember)
 }
