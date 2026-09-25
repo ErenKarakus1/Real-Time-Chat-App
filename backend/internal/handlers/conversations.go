@@ -13,6 +13,7 @@ import (
 )
 
 type ConversationService interface {
+	AddRoomParticipant(ctx context.Context, input services.AddRoomParticipantInput) (models.ConversationParticipant, error)
 	CreateDirect(ctx context.Context, input services.CreateDirectInput) (models.Conversation, error)
 	CreateRoom(ctx context.Context, input services.CreateRoomInput) (models.Conversation, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
@@ -28,6 +29,10 @@ type createRoomRequest struct {
 
 type createDirectRequest struct {
 	OtherUserID string `json:"other_user_id"`
+}
+
+type addParticipantRequest struct {
+	UserID string `json:"user_id"`
 }
 
 func NewConversationHandler(conversations ConversationService) *ConversationHandler {
@@ -114,6 +119,52 @@ func (h *ConversationHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.NewConversationResponses(conversations))
+}
+
+func (h *ConversationHandler) AddParticipant(c *gin.Context) {
+	actorID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	var req addParticipantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id must be a valid UUID"})
+		return
+	}
+
+	participant, err := h.conversations.AddRoomParticipant(c, services.AddRoomParticipantInput{
+		ConversationID: conversationID,
+		ActorID:        actorID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrInvalidParticipant) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not add participant"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, models.NewParticipantResponse(participant))
 }
 
 func authenticatedUserID(c *gin.Context) (uuid.UUID, bool) {

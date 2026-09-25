@@ -56,6 +56,7 @@ func main() {
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
 	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
 	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
+	router.POST("/conversations/:conversation_id/participants", authMiddleware, conversationHandler.AddParticipant)
 	router.GET("/conversations/:conversation_id/messages", authMiddleware, messageHandler.List)
 	router.POST("/conversations/:conversation_id/messages", authMiddleware, messageHandler.Create)
 	router.GET("/ws/conversations/:conversation_id", webSocketHandler.Conversation)
