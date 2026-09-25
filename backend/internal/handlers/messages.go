@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -76,8 +77,7 @@ func (h *MessageHandler) Create(c *gin.Context) {
 		Type: realtime.EventMessageCreated,
 		Data: response,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not broadcast message"})
-		return
+		log.Printf("broadcast message: %v", err)
 	}
 
 	c.JSON(http.StatusCreated, response)
