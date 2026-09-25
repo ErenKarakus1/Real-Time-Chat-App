@@ -70,7 +70,7 @@ func (h *WebSocketHandler) Conversation(c *gin.Context) {
 	}
 
 	client := realtime.NewClient(conn)
-	h.hub.Subscribe(conversationID, client)
+	h.hub.Subscribe(c, conversationID, client)
 	defer h.hub.Unsubscribe(conversationID, client)
 
 	go client.WritePump()

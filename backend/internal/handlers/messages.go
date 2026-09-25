@@ -72,10 +72,13 @@ func (h *MessageHandler) Create(c *gin.Context) {
 	}
 
 	response := models.NewMessageResponse(message)
-	h.hub.Broadcast(conversationID, realtime.Event{
+	if err := h.hub.Publish(c, conversationID, realtime.Event{
 		Type: realtime.EventMessageCreated,
 		Data: response,
-	})
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not broadcast message"})
+		return
+	}
 
 	c.JSON(http.StatusCreated, response)
 }
