@@ -74,10 +74,5 @@ func (h *WebSocketHandler) Conversation(c *gin.Context) {
 	defer h.hub.Unsubscribe(conversationID, client)
 
 	go client.WritePump()
-
-	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
-			return
-		}
-	}
+	client.ReadPump()
 }
