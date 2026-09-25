@@ -183,6 +183,37 @@ func (r *ConversationRepository) FindParticipant(ctx context.Context, conversati
 	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID))
 }
 
+func (r *ConversationRepository) ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error) {
+	query := `
+		SELECT conversation_id, user_id, role, joined_at
+		FROM conversation_participants
+		WHERE conversation_id = $1
+		ORDER BY joined_at ASC
+	`
+
+	rows, err := r.db.Query(ctx, query, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	participants := make([]models.ConversationParticipant, 0)
+	for rows.Next() {
+		participant, err := scanConversationParticipant(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		participants = append(participants, participant)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return participants, nil
+}
+
 func (r *ConversationRepository) AddParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error) {
 	query := `
 		INSERT INTO conversation_participants (conversation_id, user_id, role)

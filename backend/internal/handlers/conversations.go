@@ -16,6 +16,7 @@ type ConversationService interface {
 	AddRoomParticipant(ctx context.Context, input services.AddRoomParticipantInput) (models.ConversationParticipant, error)
 	CreateDirect(ctx context.Context, input services.CreateDirectInput) (models.Conversation, error)
 	CreateRoom(ctx context.Context, input services.CreateRoomInput) (models.Conversation, error)
+	ListParticipants(ctx context.Context, input services.ListParticipantsInput) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 }
 
@@ -165,6 +166,35 @@ func (h *ConversationHandler) AddParticipant(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, models.NewParticipantResponse(participant))
+}
+
+func (h *ConversationHandler) ListParticipants(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	participants, err := h.conversations.ListParticipants(c, services.ListParticipantsInput{
+		ConversationID: conversationID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list participants"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewParticipantResponses(participants))
 }
 
 func authenticatedUserID(c *gin.Context) (uuid.UUID, bool) {

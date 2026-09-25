@@ -27,6 +27,8 @@ type ConversationRepository interface {
 	FindByID(ctx context.Context, conversationID uuid.UUID) (models.Conversation, error)
 	FindDirectBetweenUsers(ctx context.Context, userID uuid.UUID, otherUserID uuid.UUID) (models.Conversation, error)
 	FindParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error)
+	IsParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (bool, error)
+	ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 }
 
@@ -47,6 +49,11 @@ type CreateDirectInput struct {
 type AddRoomParticipantInput struct {
 	ConversationID uuid.UUID
 	ActorID        uuid.UUID
+	UserID         uuid.UUID
+}
+
+type ListParticipantsInput struct {
+	ConversationID uuid.UUID
 	UserID         uuid.UUID
 }
 
@@ -121,4 +128,17 @@ func (s *ConversationService) AddRoomParticipant(ctx context.Context, input AddR
 	}
 
 	return s.conversations.AddParticipant(ctx, input.ConversationID, input.UserID, models.ParticipantRoleMember)
+}
+
+func (s *ConversationService) ListParticipants(ctx context.Context, input ListParticipantsInput) ([]models.ConversationParticipant, error) {
+	isParticipant, err := s.conversations.IsParticipant(ctx, input.ConversationID, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isParticipant {
+		return nil, ErrConversationManagementDenied
+	}
+
+	return s.conversations.ListParticipants(ctx, input.ConversationID)
 }

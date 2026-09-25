@@ -21,3 +21,12 @@ func NewParticipantResponse(participant ConversationParticipant) ParticipantResp
 		JoinedAt:       participant.JoinedAt,
 	}
 }
+
+func NewParticipantResponses(participants []ConversationParticipant) []ParticipantResponse {
+	responses := make([]ParticipantResponse, 0, len(participants))
+	for _, participant := range participants {
+		responses = append(responses, NewParticipantResponse(participant))
+	}
+
+	return responses
+}
