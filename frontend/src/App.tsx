@@ -7,12 +7,14 @@ import {
   createRoom,
   conversationWebSocketURL,
   deleteMessage,
+  deleteRoom,
   listConversations,
   listMessages,
   login,
   me,
   register,
   updateMessage,
+  updateRoom,
   type Conversation,
   type Message,
   type RealtimeEvent,
@@ -80,6 +82,8 @@ function App() {
   const [editingContent, setEditingContent] = useState('')
   const [pendingMessageID, setPendingMessageID] = useState('')
   const [typingUserIDs, setTypingUserIDs] = useState<string[]>([])
+  const [roomNameDraft, setRoomNameDraft] = useState('')
+  const [isUpdatingRoom, setIsUpdatingRoom] = useState(false)
   const socketRef = useRef<WebSocket | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
 
@@ -133,7 +137,12 @@ function App() {
       .then((items) => {
         if (isCurrent) {
           setConversations(items)
-          setSelectedConversationID((currentID) => currentID || items[0]?.id || '')
+          setSelectedConversationID((currentID) => {
+            const nextID = currentID || items[0]?.id || ''
+            const selectedConversation = items.find((item) => item.id === nextID)
+            setRoomNameDraft(selectedConversation?.name ?? '')
+            return nextID
+          })
         }
       })
       .catch((caughtError) => {
@@ -360,6 +369,7 @@ function App() {
     setEditingContent('')
     setPendingMessageID('')
     setTypingUserIDs([])
+    setRoomNameDraft('')
     stopTyping()
   }
 
@@ -369,6 +379,17 @@ function App() {
     }
 
     return conversation.type === 'direct' ? 'Direct message' : 'Room'
+  }
+
+  function selectConversation(conversation: Conversation) {
+    setMessages([])
+    setSocketStatus('idle')
+    setEditingMessageID('')
+    setEditingContent('')
+    setTypingUserIDs([])
+    setRoomNameDraft(conversation.name ?? '')
+    stopTyping()
+    setSelectedConversationID(conversation.id)
   }
 
   function updateNewConversationForm(
@@ -420,6 +441,7 @@ function App() {
       setEditingMessageID('')
       setEditingContent('')
       setTypingUserIDs([])
+      setRoomNameDraft(conversation.name ?? '')
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -577,6 +599,75 @@ function App() {
     }
   }
 
+  async function handleUpdateRoom(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    const name = roomNameDraft.trim()
+    if (!name) {
+      return
+    }
+
+    setIsUpdatingRoom(true)
+    setConversationError('')
+
+    try {
+      const conversation = await updateRoom(token, selectedConversationID, { name })
+      setConversations((currentConversations) =>
+        currentConversations.map((currentConversation) =>
+          currentConversation.id === conversation.id
+            ? {
+                ...currentConversation,
+                ...conversation,
+                unread_count: currentConversation.unread_count,
+              }
+            : currentConversation,
+        ),
+      )
+      setRoomNameDraft(conversation.name ?? '')
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not update room.',
+      )
+    } finally {
+      setIsUpdatingRoom(false)
+    }
+  }
+
+  async function handleDeleteRoom() {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setIsUpdatingRoom(true)
+    setConversationError('')
+
+    try {
+      await deleteRoom(token, selectedConversationID)
+      setConversations((currentConversations) =>
+        currentConversations.filter(
+          (conversation) => conversation.id !== selectedConversationID,
+        ),
+      )
+      setSelectedConversationID('')
+      setMessages([])
+      setRoomNameDraft('')
+      setSocketStatus('idle')
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not delete room.',
+      )
+    } finally {
+      setIsUpdatingRoom(false)
+    }
+  }
+
   if (isBootstrapping) {
     return (
       <main className="auth-page">
@@ -676,15 +767,7 @@ function App() {
                   className="conversation-item"
                   data-active={conversation.id === selectedConversationID}
                   key={conversation.id}
-                  onClick={() => {
-                    setMessages([])
-                    setSocketStatus('idle')
-                    setEditingMessageID('')
-                    setEditingContent('')
-                    setTypingUserIDs([])
-                    stopTyping()
-                    setSelectedConversationID(conversation.id)
-                  }}
+                  onClick={() => selectConversation(conversation)}
                   type="button"
                 >
                   <span>{conversationLabel(conversation)}</span>
@@ -719,6 +802,34 @@ function App() {
                   </span>
                 </div>
                 <h2>{conversationLabel(selectedConversation)}</h2>
+                {selectedConversation.type === 'room' && (
+                  <form className="room-tools" onSubmit={handleUpdateRoom}>
+                    <input
+                      aria-label="Room name"
+                      minLength={2}
+                      onChange={(event) => setRoomNameDraft(event.target.value)}
+                      type="text"
+                      value={roomNameDraft}
+                    />
+                    <button
+                      disabled={
+                        isUpdatingRoom ||
+                        !roomNameDraft.trim() ||
+                        roomNameDraft.trim() === selectedConversation.name
+                      }
+                      type="submit"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      disabled={isUpdatingRoom}
+                      type="button"
+                      onClick={handleDeleteRoom}
+                    >
+                      Delete
+                    </button>
+                  </form>
+                )}
               </div>
 
               <div className="message-list" aria-live="polite">

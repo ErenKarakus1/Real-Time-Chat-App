@@ -76,6 +76,10 @@ type CreateRoomInput = {
   name: string
 }
 
+type UpdateRoomInput = {
+  name: string
+}
+
 type CreateDirectInput = {
   other_user_id: string
 }
@@ -149,6 +153,28 @@ export async function createDirect(
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify(input),
+  })
+}
+
+export async function updateRoom(
+  token: string,
+  conversationID: string,
+  input: UpdateRoomInput,
+): Promise<Conversation> {
+  return request<Conversation>(`/conversations/${conversationID}`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+export async function deleteRoom(
+  token: string,
+  conversationID: string,
+): Promise<void> {
+  await request<void>(`/conversations/${conversationID}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
   })
 }
 

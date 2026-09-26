@@ -295,6 +295,8 @@ input:focus {
 }
 
 .chat-title {
+  display: grid;
+  gap: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
@@ -321,6 +323,29 @@ input:focus {
 .socket-status[data-status='connected'] {
   color: #166534;
   background: #dcfce7;
+}
+
+.room-tools {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 8px;
+}
+
+.room-tools button {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.room-tools button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .message-list {
@@ -481,6 +506,10 @@ input:focus {
   }
 
   .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .room-tools {
     grid-template-columns: 1fr;
   }
 }
