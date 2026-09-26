@@ -6,11 +6,13 @@ import {
   createMessage,
   createRoom,
   conversationWebSocketURL,
+  deleteMessage,
   listConversations,
   listMessages,
   login,
   me,
   register,
+  updateMessage,
   type Conversation,
   type Message,
   type RealtimeEvent,
@@ -74,6 +76,9 @@ function App() {
   const [socketStatus, setSocketStatus] = useState<'idle' | 'connected' | 'offline'>(
     'idle',
   )
+  const [editingMessageID, setEditingMessageID] = useState('')
+  const [editingContent, setEditingContent] = useState('')
+  const [pendingMessageID, setPendingMessageID] = useState('')
 
   useEffect(() => {
     if (!token) {
@@ -328,6 +333,9 @@ function App() {
     setDraftMessage('')
     setMessageError('')
     setSocketStatus('idle')
+    setEditingMessageID('')
+    setEditingContent('')
+    setPendingMessageID('')
   }
 
   function conversationLabel(conversation: Conversation) {
@@ -384,6 +392,8 @@ function App() {
       setSelectedConversationID(conversation.id)
       setMessages([])
       setSocketStatus('idle')
+      setEditingMessageID('')
+      setEditingContent('')
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -430,6 +440,79 @@ function App() {
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(value))
+  }
+
+  function startEditingMessage(message: Message) {
+    setEditingMessageID(message.id)
+    setEditingContent(message.content)
+    setMessageError('')
+  }
+
+  function cancelEditingMessage() {
+    setEditingMessageID('')
+    setEditingContent('')
+  }
+
+  async function handleUpdateMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !selectedConversationID || !editingMessageID) {
+      return
+    }
+
+    const content = editingContent.trim()
+    if (!content) {
+      return
+    }
+
+    setPendingMessageID(editingMessageID)
+    setMessageError('')
+
+    try {
+      const message = await updateMessage(token, selectedConversationID, editingMessageID, {
+        content,
+      })
+      setMessages((currentMessages) =>
+        currentMessages.map((currentMessage) =>
+          currentMessage.id === message.id ? message : currentMessage,
+        ),
+      )
+      cancelEditingMessage()
+    } catch (caughtError) {
+      setMessageError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not update message.',
+      )
+    } finally {
+      setPendingMessageID('')
+    }
+  }
+
+  async function handleDeleteMessage(messageID: string) {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setPendingMessageID(messageID)
+    setMessageError('')
+
+    try {
+      await deleteMessage(token, selectedConversationID, messageID)
+      setMessages((currentMessages) =>
+        currentMessages.filter((message) => message.id !== messageID),
+      )
+      if (editingMessageID === messageID) {
+        cancelEditingMessage()
+      }
+    } catch (caughtError) {
+      setMessageError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not delete message.',
+      )
+    } finally {
+      setPendingMessageID('')
+    }
   }
 
   if (isBootstrapping) {
@@ -534,6 +617,8 @@ function App() {
                   onClick={() => {
                     setMessages([])
                     setSocketStatus('idle')
+                    setEditingMessageID('')
+                    setEditingContent('')
                     setSelectedConversationID(conversation.id)
                   }}
                   type="button"
@@ -586,6 +671,8 @@ function App() {
                 ) : (
                   messages.map((message) => {
                     const isOwnMessage = message.sender_id === user.id
+                    const isEditingMessage = editingMessageID === message.id
+                    const isPendingMessage = pendingMessageID === message.id
 
                     return (
                       <article
@@ -593,10 +680,57 @@ function App() {
                         data-own={isOwnMessage}
                         key={message.id}
                       >
-                        <p>{message.content}</p>
-                        <time dateTime={message.created_at}>
-                          {formatMessageTime(message.created_at)}
-                        </time>
+                        {isEditingMessage ? (
+                          <form className="edit-message-form" onSubmit={handleUpdateMessage}>
+                            <input
+                              aria-label="Edit message"
+                              onChange={(event) => setEditingContent(event.target.value)}
+                              type="text"
+                              value={editingContent}
+                            />
+                            <div className="message-actions">
+                              <button
+                                disabled={isPendingMessage || !editingContent.trim()}
+                                type="submit"
+                              >
+                                Save
+                              </button>
+                              <button type="button" onClick={cancelEditingMessage}>
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <p>{message.content}</p>
+                            <div className="message-meta">
+                              <time dateTime={message.created_at}>
+                                {formatMessageTime(message.created_at)}
+                              </time>
+                              {message.updated_at !== message.created_at && (
+                                <span>Edited</span>
+                              )}
+                            </div>
+                            {isOwnMessage && (
+                              <div className="message-actions">
+                                <button
+                                  disabled={isPendingMessage}
+                                  type="button"
+                                  onClick={() => startEditingMessage(message)}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  disabled={isPendingMessage}
+                                  type="button"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </article>
                     )
                   })

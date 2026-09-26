@@ -84,6 +84,10 @@ type CreateMessageInput = {
   content: string
 }
 
+type UpdateMessageInput = {
+  content: string
+}
+
 type ApiErrorBody = {
   error?: string
 }
@@ -166,6 +170,33 @@ export async function createMessage(
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify(input),
+  })
+}
+
+export async function updateMessage(
+  token: string,
+  conversationID: string,
+  messageID: string,
+  input: UpdateMessageInput,
+): Promise<Message> {
+  return request<Message>(
+    `/conversations/${conversationID}/messages/${messageID}`,
+    {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export async function deleteMessage(
+  token: string,
+  conversationID: string,
+  messageID: string,
+): Promise<void> {
+  await request<void>(`/conversations/${conversationID}/messages/${messageID}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
   })
 }
 

@@ -356,14 +356,60 @@ input:focus {
 }
 
 .message-bubble time {
-  justify-self: end;
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
-.message-bubble[data-own='true'] time {
+.message-bubble[data-own='true'] time,
+.message-bubble[data-own='true'] .message-meta span {
   color: rgb(255 255 255 / 0.78);
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.message-meta span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.message-actions button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.82);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.message-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.edit-message-form {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-message-form input {
+  min-width: min(360px, 58vw);
 }
 
 .composer {
