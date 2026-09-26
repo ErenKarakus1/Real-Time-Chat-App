@@ -14,6 +14,7 @@ import {
   listMessages,
   listParticipants,
   login,
+  markConversationRead,
   me,
   register,
   removeParticipant,
@@ -71,6 +72,7 @@ function App() {
   const [selectedConversationID, setSelectedConversationID] = useState('')
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [conversationError, setConversationError] = useState('')
+  const [conversationSearch, setConversationSearch] = useState('')
   const [newConversationForm, setNewConversationForm] = useState(
     emptyNewConversationForm,
   )
@@ -141,7 +143,7 @@ function App() {
           setConversationError('')
         }
 
-        return listConversations(token)
+        return listConversations(token, conversationSearch)
       })
       .then((items) => {
         if (isCurrent) {
@@ -172,7 +174,7 @@ function App() {
     return () => {
       isCurrent = false
     }
-  }, [token, user])
+  }, [token, user, conversationSearch])
 
   useEffect(() => {
     if (!token || !selectedConversationID) {
@@ -418,6 +420,7 @@ function App() {
     setSelectedConversationID('')
     setNewConversationForm(emptyNewConversationForm)
     setConversationError('')
+    setConversationSearch('')
     setMessages([])
     setDraftMessage('')
     setMessageError('')
@@ -453,6 +456,19 @@ function App() {
     setPendingParticipantID('')
     stopTyping()
     setSelectedConversationID(conversation.id)
+    if (token) {
+      markConversationRead(token, conversation.id)
+        .then(() => {
+          setConversations((currentConversations) =>
+            currentConversations.map((currentConversation) =>
+              currentConversation.id === conversation.id
+                ? { ...currentConversation, unread_count: 0 }
+                : currentConversation,
+            ),
+          )
+        })
+        .catch(() => undefined)
+    }
   }
 
   function updateNewConversationForm(
@@ -910,6 +926,16 @@ function App() {
           {conversationError && (
             <p className="form-message error">{conversationError}</p>
           )}
+
+          <label className="conversation-search">
+            Search
+            <input
+              onChange={(event) => setConversationSearch(event.target.value)}
+              placeholder="Room name"
+              type="search"
+              value={conversationSearch}
+            />
+          </label>
 
           <div className="conversation-list">
             {isLoadingConversations ? (

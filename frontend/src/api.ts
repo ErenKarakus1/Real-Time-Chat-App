@@ -140,8 +140,17 @@ export async function me(token: string): Promise<User> {
   })
 }
 
-export async function listConversations(token: string): Promise<Conversation[]> {
-  return request<Conversation[]>('/conversations', {
+export async function listConversations(
+  token: string,
+  query = '',
+): Promise<Conversation[]> {
+  const params = new URLSearchParams()
+  if (query.trim()) {
+    params.set('q', query.trim())
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return request<Conversation[]>(`/conversations${suffix}`, {
     headers: authHeaders(token),
   })
 }
@@ -228,6 +237,16 @@ export async function leaveRoom(
 ): Promise<void> {
   await request<void>(`/conversations/${conversationID}/participants/me`, {
     method: 'DELETE',
+    headers: authHeaders(token),
+  })
+}
+
+export async function markConversationRead(
+  token: string,
+  conversationID: string,
+): Promise<Participant> {
+  return request<Participant>(`/conversations/${conversationID}/read`, {
+    method: 'POST',
     headers: authHeaders(token),
   })
 }

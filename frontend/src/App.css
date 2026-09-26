@@ -223,6 +223,11 @@ input:focus {
   overflow: auto;
 }
 
+.conversation-search {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
 .conversation-item {
   display: grid;
   gap: 4px;
