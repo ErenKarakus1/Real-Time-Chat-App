@@ -10,6 +10,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type ConversationService interface {
@@ -163,6 +164,10 @@ func (h *ConversationHandler) MarkRead(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not mark conversation read"})
 		return
@@ -203,6 +208,10 @@ func (h *ConversationHandler) UpdateRoomName(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update room"})
 		return
@@ -230,6 +239,10 @@ func (h *ConversationHandler) DeleteRoom(c *gin.Context) {
 	})
 	if errors.Is(err, services.ErrConversationManagementDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
 	}
 	if err != nil {
@@ -278,6 +291,10 @@ func (h *ConversationHandler) AddParticipant(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation or participant not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not add participant"})
 		return
@@ -305,6 +322,10 @@ func (h *ConversationHandler) ListParticipants(c *gin.Context) {
 	})
 	if errors.Is(err, services.ErrConversationManagementDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
 	}
 	if err != nil {
@@ -354,6 +375,10 @@ func (h *ConversationHandler) UpdateParticipantRole(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation or participant not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update participant role"})
 		return
@@ -394,6 +419,10 @@ func (h *ConversationHandler) RemoveParticipant(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation or participant not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove participant"})
 		return
@@ -425,6 +454,10 @@ func (h *ConversationHandler) LeaveRoom(c *gin.Context) {
 	}
 	if errors.Is(err, services.ErrConversationManagementDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation or participant not found"})
 		return
 	}
 	if err != nil {
@@ -471,6 +504,10 @@ func (h *ConversationHandler) TransferOwnership(c *gin.Context) {
 	}
 	if errors.Is(err, services.ErrConversationManagementDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation or participant not found"})
 		return
 	}
 	if err != nil {

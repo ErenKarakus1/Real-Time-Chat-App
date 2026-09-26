@@ -16,6 +16,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type fakeHandlerConversationService struct {
@@ -23,6 +24,7 @@ type fakeHandlerConversationService struct {
 	markReadErr    error
 	markReadCalled bool
 	createRoomErr  error
+	updateRoomErr  error
 }
 
 func (s *fakeHandlerConversationService) AddRoomParticipant(ctx context.Context, input services.AddRoomParticipantInput) (models.ConversationParticipant, error) {
@@ -79,6 +81,9 @@ func (s *fakeHandlerConversationService) TransferOwnership(ctx context.Context, 
 }
 
 func (s *fakeHandlerConversationService) UpdateRoomName(ctx context.Context, input services.UpdateRoomNameInput) (models.Conversation, error) {
+	if s.updateRoomErr != nil {
+		return models.Conversation{}, s.updateRoomErr
+	}
 	return models.Conversation{}, nil
 }
 
@@ -157,7 +162,7 @@ func TestConversationHandlerListReturnsUnreadCount(t *testing.T) {
 	service := &fakeHandlerConversationService{
 		listResult: []models.ConversationListItem{{
 			Conversation: models.Conversation{ID: conversationID, Type: models.ConversationTypeRoom},
-			UnreadCount: 3,
+			UnreadCount:  3,
 		}},
 	}
 	handler := NewConversationHandler(service)
@@ -217,6 +222,25 @@ func TestConversationHandlerCreateRoomValidation(t *testing.T) {
 	}
 }
 
+func TestConversationHandlerNotFoundStatus(t *testing.T) {
+	conversationID := uuid.New()
+	service := &fakeHandlerConversationService{markReadErr: pgx.ErrNoRows, updateRoomErr: pgx.ErrNoRows}
+	handler := NewConversationHandler(service)
+	router := testRouter(uuid.New())
+	router.POST("/conversations/:conversation_id/read", handler.MarkRead)
+	router.PATCH("/conversations/:conversation_id", handler.UpdateRoomName)
+
+	recorder := performJSON(router, http.MethodPost, "/conversations/"+conversationID.String()+"/read", "")
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("mark read not found status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+
+	recorder = performJSON(router, http.MethodPatch, "/conversations/"+conversationID.String(), `{"name":"dev"}`)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("update room not found status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
 func TestMessageHandlerCreatePublishesEvent(t *testing.T) {
 	userID := uuid.New()
 	conversationID := uuid.New()
@@ -231,6 +255,26 @@ func TestMessageHandlerCreatePublishesEvent(t *testing.T) {
 	}
 	if len(pubsub.events) != 1 || pubsub.events[0].Type != realtime.EventMessageCreated {
 		t.Fatalf("events = %+v, want message.created", pubsub.events)
+	}
+}
+
+func TestMessageHandlerNotFoundStatus(t *testing.T) {
+	userID := uuid.New()
+	conversationID := uuid.New()
+	messageID := uuid.New()
+	handler := NewMessageHandler(&fakeHandlerMessageService{updateErr: pgx.ErrNoRows, deleteErr: pgx.ErrNoRows}, realtime.NewHub(&fakePubSub{}))
+	router := testRouter(userID)
+	router.PATCH("/conversations/:conversation_id/messages/:message_id", handler.Update)
+	router.DELETE("/conversations/:conversation_id/messages/:message_id", handler.Delete)
+
+	recorder := performJSON(router, http.MethodPatch, "/conversations/"+conversationID.String()+"/messages/"+messageID.String(), `{"content":"hello"}`)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("update not found status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+
+	recorder = performJSON(router, http.MethodDelete, "/conversations/"+conversationID.String()+"/messages/"+messageID.String(), "")
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("delete not found status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
 }
 

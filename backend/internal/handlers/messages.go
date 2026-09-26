@@ -13,6 +13,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type MessageService interface {
@@ -79,6 +80,10 @@ func (h *MessageHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create message"})
 		return
@@ -130,6 +135,10 @@ func (h *MessageHandler) List(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list messages"})
 		return
@@ -177,6 +186,10 @@ func (h *MessageHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update message"})
 		return
@@ -219,6 +232,10 @@ func (h *MessageHandler) Delete(c *gin.Context) {
 	})
 	if errors.Is(err, services.ErrConversationAccessDenied) || errors.Is(err, services.ErrMessageOwnershipDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
 		return
 	}
 	if err != nil {

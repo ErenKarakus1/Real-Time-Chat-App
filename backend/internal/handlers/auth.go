@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type UserService interface {
@@ -121,8 +123,12 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	}
 
 	user, err := h.users.FindByID(c, userID)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get current user"})
 		return
 	}
 
