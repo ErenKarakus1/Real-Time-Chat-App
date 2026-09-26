@@ -44,3 +44,21 @@ func TestValidateMigrateOnlyRequiresDatabaseURL(t *testing.T) {
 		t.Fatalf("missing database error = %v, want DATABASE_URL", err)
 	}
 }
+
+func TestCORSAllowedOriginsParsesCommaSeparatedOrigins(t *testing.T) {
+	cfg := Config{
+		CORSAllowedOrigin: "http://localhost:5173, http://127.0.0.1:5173,,",
+	}
+
+	origins := cfg.CORSAllowedOrigins()
+	expected := []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+	if len(origins) != len(expected) {
+		t.Fatalf("origins = %v, want %v", origins, expected)
+	}
+
+	for index, origin := range expected {
+		if origins[index] != origin {
+			t.Fatalf("origin %d = %q, want %q", index, origins[index], origin)
+		}
+	}
+}

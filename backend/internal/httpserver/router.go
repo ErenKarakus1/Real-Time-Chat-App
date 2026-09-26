@@ -20,7 +20,7 @@ import (
 func NewRouter(cfg config.Config, dbPool *pgxpool.Pool, redisClient *redis.Client) *gin.Engine {
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{cfg.CORSAllowedOrigin},
+		AllowOrigins:     cfg.CORSAllowedOrigins(),
 		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,

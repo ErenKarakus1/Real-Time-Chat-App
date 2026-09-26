@@ -17,6 +17,8 @@ type Config struct {
 	CORSAllowedOrigin string
 }
 
+const defaultCORSAllowedOrigin = "http://localhost:5173,http://127.0.0.1:5173"
+
 func Load() Config {
 	_ = godotenv.Load()
 
@@ -26,8 +28,20 @@ func Load() Config {
 		DatabaseURL:       getEnv("DATABASE_URL", ""),
 		RedisURL:          getEnv("REDIS_URL", ""),
 		JWTSecret:         getEnv("JWT_SECRET", ""),
-		CORSAllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:5173"),
+		CORSAllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", defaultCORSAllowedOrigin),
 	}
+}
+
+func (c Config) CORSAllowedOrigins() []string {
+	var origins []string
+	for _, origin := range strings.Split(c.CORSAllowedOrigin, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+
+	return origins
 }
 
 func (c Config) ValidateServer() error {

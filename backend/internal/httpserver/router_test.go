@@ -68,10 +68,10 @@ func TestRegisterRoutes(t *testing.T) {
 
 func TestNewRouterAllowsConfiguredCORSOrigin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	origin := "http://localhost:5173"
+	origin := "http://127.0.0.1:5173"
 	router := NewRouter(config.Config{
 		JWTSecret:         "test-secret",
-		CORSAllowedOrigin: origin,
+		CORSAllowedOrigin: "http://localhost:5173,http://127.0.0.1:5173",
 	}, nil, nil)
 
 	request := httptest.NewRequest(http.MethodOptions, "/auth/login", nil)
