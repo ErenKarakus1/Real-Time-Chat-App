@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -20,6 +21,8 @@ type Client struct {
 	once sync.Once
 }
 
+type IncomingEventHandler func(event Event)
+
 func NewClient(conn *websocket.Conn) *Client {
 	return &Client{
 		conn: conn,
@@ -27,7 +30,7 @@ func NewClient(conn *websocket.Conn) *Client {
 	}
 }
 
-func (c *Client) ReadPump() {
+func (c *Client) ReadPump(handle IncomingEventHandler) {
 	defer c.conn.Close()
 
 	c.conn.SetReadLimit(1024)
@@ -38,9 +41,21 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		if _, _, err := c.conn.ReadMessage(); err != nil {
+		_, payload, err := c.conn.ReadMessage()
+		if err != nil {
 			return
 		}
+
+		if handle == nil {
+			continue
+		}
+
+		var event Event
+		if err := json.Unmarshal(payload, &event); err != nil {
+			continue
+		}
+
+		handle(event)
 	}
 }
 

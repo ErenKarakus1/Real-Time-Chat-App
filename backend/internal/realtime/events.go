@@ -5,6 +5,8 @@ import "encoding/json"
 const EventMessageCreated = "message.created"
 const EventMessageDeleted = "message.deleted"
 const EventMessageUpdated = "message.updated"
+const EventTypingStarted = "typing.started"
+const EventTypingStopped = "typing.stopped"
 
 type Event struct {
 	Type string      `json:"type"`

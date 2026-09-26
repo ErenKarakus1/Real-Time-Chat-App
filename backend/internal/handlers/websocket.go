@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/auth"
@@ -22,6 +23,11 @@ type WebSocketHandler struct {
 	presence      *presence.Service
 	jwtSecret     string
 	upgrader      websocket.Upgrader
+}
+
+type typingEventResponse struct {
+	ConversationID uuid.UUID `json:"conversation_id"`
+	UserID         uuid.UUID `json:"user_id"`
 }
 
 func NewWebSocketHandler(conversations WebSocketConversationService, hub *realtime.Hub, presence *presence.Service, jwtSecret string) *WebSocketHandler {
@@ -81,7 +87,38 @@ func (h *WebSocketHandler) Conversation(c *gin.Context) {
 
 	h.hub.Subscribe(c, conversationID, client)
 	defer h.hub.Unsubscribe(conversationID, client)
+	defer h.publishTypingStopped(context.Background(), conversationID, userID)
 
 	go client.WritePump()
-	client.ReadPump()
+	client.ReadPump(func(event realtime.Event) {
+		h.handleIncomingEvent(context.Background(), conversationID, userID, event)
+	})
+}
+
+func (h *WebSocketHandler) publishTypingStopped(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) {
+	if err := h.hub.Publish(ctx, conversationID, realtime.Event{
+		Type: realtime.EventTypingStopped,
+		Data: typingEventResponse{
+			ConversationID: conversationID,
+			UserID:         userID,
+		},
+	}); err != nil {
+		log.Printf("broadcast typing stop: %v", err)
+	}
+}
+
+func (h *WebSocketHandler) handleIncomingEvent(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, event realtime.Event) {
+	if event.Type != realtime.EventTypingStarted && event.Type != realtime.EventTypingStopped {
+		return
+	}
+
+	if err := h.hub.Publish(ctx, conversationID, realtime.Event{
+		Type: event.Type,
+		Data: typingEventResponse{
+			ConversationID: conversationID,
+			UserID:         userID,
+		},
+	}); err != nil {
+		log.Printf("broadcast typing event: %v", err)
+	}
 }

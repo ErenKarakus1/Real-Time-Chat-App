@@ -329,3 +329,31 @@ func TestMessageHandlerInternalError(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusInternalServerError)
 	}
 }
+
+func TestWebSocketHandlerPublishesTypingEvents(t *testing.T) {
+	pubsub := &fakePubSub{}
+	handler := NewWebSocketHandler(nil, realtime.NewHub(pubsub), nil, "secret")
+	conversationID := uuid.New()
+	userID := uuid.New()
+
+	handler.handleIncomingEvent(context.Background(), conversationID, userID, realtime.Event{Type: realtime.EventTypingStarted})
+	if len(pubsub.events) != 1 {
+		t.Fatalf("published %d events, want 1", len(pubsub.events))
+	}
+	if pubsub.events[0].Type != realtime.EventTypingStarted {
+		t.Fatalf("event type = %s, want %s", pubsub.events[0].Type, realtime.EventTypingStarted)
+	}
+
+	payload, ok := pubsub.events[0].Data.(typingEventResponse)
+	if !ok {
+		t.Fatalf("event data type = %T, want typingEventResponse", pubsub.events[0].Data)
+	}
+	if payload.ConversationID != conversationID || payload.UserID != userID {
+		t.Fatalf("payload = %+v, want conversation %s user %s", payload, conversationID, userID)
+	}
+
+	handler.handleIncomingEvent(context.Background(), conversationID, userID, realtime.Event{Type: "message.created"})
+	if len(pubsub.events) != 1 {
+		t.Fatalf("published %d events after ignored event, want 1", len(pubsub.events))
+	}
+}
