@@ -73,6 +73,11 @@ type RemoveParticipantInput struct {
 	UserID         uuid.UUID
 }
 
+type LeaveRoomInput struct {
+	ConversationID uuid.UUID
+	UserID         uuid.UUID
+}
+
 func NewConversationService(conversations ConversationRepository) *ConversationService {
 	return &ConversationService{
 		conversations: conversations,
@@ -222,6 +227,32 @@ func (s *ConversationService) RemoveParticipant(ctx context.Context, input Remov
 	}
 
 	if actor.Role == models.ParticipantRoleAdmin && target.Role != models.ParticipantRoleMember {
+		return ErrConversationManagementDenied
+	}
+
+	return s.conversations.RemoveParticipant(ctx, input.ConversationID, input.UserID)
+}
+
+func (s *ConversationService) LeaveRoom(ctx context.Context, input LeaveRoomInput) error {
+	if input.UserID == uuid.Nil {
+		return ErrInvalidParticipant
+	}
+
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return ErrConversationManagementDenied
+	}
+
+	participant, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.UserID)
+	if err != nil {
+		return err
+	}
+
+	if participant.Role == models.ParticipantRoleOwner {
 		return ErrConversationManagementDenied
 	}
 

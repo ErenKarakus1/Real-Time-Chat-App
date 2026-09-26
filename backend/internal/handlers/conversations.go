@@ -16,6 +16,7 @@ type ConversationService interface {
 	AddRoomParticipant(ctx context.Context, input services.AddRoomParticipantInput) (models.ConversationParticipant, error)
 	CreateDirect(ctx context.Context, input services.CreateDirectInput) (models.Conversation, error)
 	CreateRoom(ctx context.Context, input services.CreateRoomInput) (models.Conversation, error)
+	LeaveRoom(ctx context.Context, input services.LeaveRoomInput) error
 	ListParticipants(ctx context.Context, input services.ListParticipantsInput) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, input services.RemoveParticipantInput) error
@@ -284,6 +285,39 @@ func (h *ConversationHandler) RemoveParticipant(c *gin.Context) {
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove participant"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (h *ConversationHandler) LeaveRoom(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	err := h.conversations.LeaveRoom(c, services.LeaveRoomInput{
+		ConversationID: conversationID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrInvalidParticipant) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not leave room"})
 		return
 	}
 
