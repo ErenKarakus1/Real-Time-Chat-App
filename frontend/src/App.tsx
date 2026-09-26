@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import './App.css'
 import {
   ApiError,
@@ -79,6 +79,9 @@ function App() {
   const [editingMessageID, setEditingMessageID] = useState('')
   const [editingContent, setEditingContent] = useState('')
   const [pendingMessageID, setPendingMessageID] = useState('')
+  const [typingUserIDs, setTypingUserIDs] = useState<string[]>([])
+  const socketRef = useRef<WebSocket | null>(null)
+  const typingTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!token) {
@@ -202,6 +205,7 @@ function App() {
     const socket = new WebSocket(
       conversationWebSocketURL(token, selectedConversationID),
     )
+    socketRef.current = socket
     let isCurrent = true
 
     socket.addEventListener('open', () => {
@@ -239,6 +243,24 @@ function App() {
         setMessages((currentMessages) =>
           currentMessages.filter((message) => message.id !== realtimeEvent.data.id),
         )
+        return
+      }
+
+      if (realtimeEvent.type === 'typing.started') {
+        if (realtimeEvent.data.user_id !== user?.id) {
+          setTypingUserIDs((currentUserIDs) =>
+            currentUserIDs.includes(realtimeEvent.data.user_id)
+              ? currentUserIDs
+              : [...currentUserIDs, realtimeEvent.data.user_id],
+          )
+        }
+        return
+      }
+
+      if (realtimeEvent.type === 'typing.stopped') {
+        setTypingUserIDs((currentUserIDs) =>
+          currentUserIDs.filter((userID) => userID !== realtimeEvent.data.user_id),
+        )
       }
     })
 
@@ -256,9 +278,10 @@ function App() {
 
     return () => {
       isCurrent = false
+      socketRef.current = null
       socket.close()
     }
-  }, [token, selectedConversationID])
+  }, [token, selectedConversationID, user?.id])
 
   const title = useMemo(() => {
     if (isBootstrapping) {
@@ -336,6 +359,8 @@ function App() {
     setEditingMessageID('')
     setEditingContent('')
     setPendingMessageID('')
+    setTypingUserIDs([])
+    stopTyping()
   }
 
   function conversationLabel(conversation: Conversation) {
@@ -394,6 +419,7 @@ function App() {
       setSocketStatus('idle')
       setEditingMessageID('')
       setEditingContent('')
+      setTypingUserIDs([])
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -424,6 +450,7 @@ function App() {
       const message = await createMessage(token, selectedConversationID, { content })
       addMessage(message)
       setDraftMessage('')
+      stopTyping()
     } catch (caughtError) {
       setMessageError(
         caughtError instanceof ApiError
@@ -433,6 +460,41 @@ function App() {
     } finally {
       setIsSendingMessage(false)
     }
+  }
+
+  function sendTypingEvent(type: 'typing.started' | 'typing.stopped') {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    socket.send(JSON.stringify({ type }))
+  }
+
+  function stopTyping() {
+    if (typingTimeoutRef.current !== null) {
+      window.clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
+    }
+
+    sendTypingEvent('typing.stopped')
+  }
+
+  function handleDraftMessageChange(value: string) {
+    setDraftMessage(value)
+
+    if (!value.trim()) {
+      stopTyping()
+      return
+    }
+
+    sendTypingEvent('typing.started')
+    if (typingTimeoutRef.current !== null) {
+      window.clearTimeout(typingTimeoutRef.current)
+    }
+    typingTimeoutRef.current = window.setTimeout(() => {
+      stopTyping()
+    }, 1600)
   }
 
   function formatMessageTime(value: string) {
@@ -619,6 +681,8 @@ function App() {
                     setSocketStatus('idle')
                     setEditingMessageID('')
                     setEditingContent('')
+                    setTypingUserIDs([])
+                    stopTyping()
                     setSelectedConversationID(conversation.id)
                   }}
                   type="button"
@@ -738,11 +802,18 @@ function App() {
               </div>
 
               {messageError && <p className="form-message error">{messageError}</p>}
+              {typingUserIDs.length > 0 && (
+                <p className="typing-indicator">
+                  {typingUserIDs.length === 1
+                    ? 'Someone is typing'
+                    : `${typingUserIDs.length} people are typing`}
+                </p>
+              )}
 
               <form className="composer" onSubmit={handleSendMessage}>
                 <input
                   aria-label="Message"
-                  onChange={(event) => setDraftMessage(event.target.value)}
+                  onChange={(event) => handleDraftMessageChange(event.target.value)}
                   placeholder="Write a message"
                   type="text"
                   value={draftMessage}

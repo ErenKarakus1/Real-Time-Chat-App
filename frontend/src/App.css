@@ -425,6 +425,12 @@ input:focus {
   padding: 0 18px;
 }
 
+.typing-indicator {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .empty-chat {
   display: grid;
   place-content: center;
