@@ -8,6 +8,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/auth"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
@@ -51,6 +52,7 @@ type SearchUsersInput struct {
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrInvalidUserSearchQuery = errors.New("search query must be at least 2 characters")
+var ErrEmailAlreadyRegistered = errors.New("email already registered")
 
 func NewUserService(users UserRepository, jwtSecret string) *UserService {
 	return &UserService{
@@ -72,7 +74,12 @@ func (s *UserService) Register(ctx context.Context, input RegisterUserInput) (mo
 		PasswordHash: passwordHash,
 	}
 
-	return s.users.Create(ctx, user)
+	createdUser, err := s.users.Create(ctx, user)
+	if isUniqueViolation(err) {
+		return models.User{}, ErrEmailAlreadyRegistered
+	}
+
+	return createdUser, err
 }
 
 func (s *UserService) Login(ctx context.Context, input LoginInput) (LoginResult, error) {
@@ -116,4 +123,9 @@ func (s *UserService) Search(ctx context.Context, input SearchUsersInput) ([]mod
 	}
 
 	return s.users.Search(ctx, query, limit)
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

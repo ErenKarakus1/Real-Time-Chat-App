@@ -98,6 +98,30 @@ type fakeHandlerMessageService struct {
 	updateErr error
 }
 
+type fakeHandlerUserService struct {
+	registerErr error
+}
+
+func (s *fakeHandlerUserService) Register(ctx context.Context, input services.RegisterUserInput) (models.User, error) {
+	if s.registerErr != nil {
+		return models.User{}, s.registerErr
+	}
+
+	return models.User{ID: uuid.New(), Username: input.Username, Email: input.Email}, nil
+}
+
+func (s *fakeHandlerUserService) Login(ctx context.Context, input services.LoginInput) (services.LoginResult, error) {
+	return services.LoginResult{}, nil
+}
+
+func (s *fakeHandlerUserService) FindByID(ctx context.Context, id uuid.UUID) (models.User, error) {
+	return models.User{}, nil
+}
+
+func (s *fakeHandlerUserService) Search(ctx context.Context, input services.SearchUsersInput) ([]models.User, error) {
+	return nil, nil
+}
+
 func (s *fakeHandlerMessageService) Create(ctx context.Context, input services.CreateMessageInput) (models.Message, error) {
 	if s.createErr != nil {
 		return models.Message{}, s.createErr
@@ -180,6 +204,27 @@ func TestConversationHandlerListReturnsUnreadCount(t *testing.T) {
 	}
 	if len(response) != 1 || response[0].UnreadCount != 3 {
 		t.Fatalf("response unread count = %+v, want 3", response)
+	}
+}
+
+func TestAuthHandlerRegisterDuplicateEmail(t *testing.T) {
+	handler := NewAuthHandler(&fakeHandlerUserService{
+		registerErr: services.ErrEmailAlreadyRegistered,
+	}, nil)
+	router := testRouter(uuid.Nil)
+	router.POST("/auth/register", handler.Register)
+
+	recorder := performJSON(router, http.MethodPost, "/auth/register", `{"username":"eren","email":"eren@example.com","password":"password123"}`)
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusConflict)
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response["error"] != "email already registered" {
+		t.Fatalf("error = %q, want email already registered", response["error"])
 	}
 }
 
