@@ -59,6 +59,7 @@ func main() {
 	router.DELETE("/conversations/:conversation_id", authMiddleware, conversationHandler.DeleteRoom)
 	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
 	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
+	router.POST("/conversations/:conversation_id/read", authMiddleware, conversationHandler.MarkRead)
 	router.PATCH("/conversations/:conversation_id/owner", authMiddleware, conversationHandler.TransferOwnership)
 	router.GET("/conversations/:conversation_id/participants", authMiddleware, conversationHandler.ListParticipants)
 	router.POST("/conversations/:conversation_id/participants", authMiddleware, conversationHandler.AddParticipant)

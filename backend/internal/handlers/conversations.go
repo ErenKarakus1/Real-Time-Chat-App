@@ -19,9 +19,10 @@ type ConversationService interface {
 	DeleteRoom(ctx context.Context, input services.DeleteRoomInput) error
 	LeaveRoom(ctx context.Context, input services.LeaveRoomInput) error
 	ListParticipants(ctx context.Context, input services.ListParticipantsInput) ([]models.ConversationParticipant, error)
-	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.ConversationListItem, error)
+	MarkRead(ctx context.Context, input services.MarkConversationReadInput) (models.ConversationParticipant, error)
 	RemoveParticipant(ctx context.Context, input services.RemoveParticipantInput) error
-	SearchForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error)
+	SearchForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.ConversationListItem, error)
 	TransferOwnership(ctx context.Context, input services.TransferOwnershipInput) (models.ConversationParticipant, error)
 	UpdateRoomName(ctx context.Context, input services.UpdateRoomNameInput) (models.Conversation, error)
 	UpdateParticipantRole(ctx context.Context, input services.UpdateParticipantRoleInput) (models.ConversationParticipant, error)
@@ -138,7 +139,36 @@ func (h *ConversationHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.NewConversationResponses(conversations))
+	c.JSON(http.StatusOK, models.NewConversationListItemResponses(conversations))
+}
+
+func (h *ConversationHandler) MarkRead(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	participant, err := h.conversations.MarkRead(c, services.MarkConversationReadInput{
+		ConversationID: conversationID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not mark conversation read"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewParticipantResponse(participant))
 }
 
 func (h *ConversationHandler) UpdateRoomName(c *gin.Context) {

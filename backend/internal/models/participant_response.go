@@ -11,6 +11,7 @@ type ParticipantResponse struct {
 	UserID         uuid.UUID       `json:"user_id"`
 	Role           ParticipantRole `json:"role"`
 	JoinedAt       time.Time       `json:"joined_at"`
+	LastReadAt     *time.Time      `json:"last_read_at"`
 }
 
 func NewParticipantResponse(participant ConversationParticipant) ParticipantResponse {
@@ -19,6 +20,7 @@ func NewParticipantResponse(participant ConversationParticipant) ParticipantResp
 		UserID:         participant.UserID,
 		Role:           participant.Role,
 		JoinedAt:       participant.JoinedAt,
+		LastReadAt:     participant.LastReadAt,
 	}
 }
 

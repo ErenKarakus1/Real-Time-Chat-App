@@ -144,12 +144,17 @@ func (r *ConversationRepository) UpdateRoomName(ctx context.Context, conversatio
 	return scanConversation(r.db.QueryRow(ctx, query, conversationID, name))
 }
 
-func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
+func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.ConversationListItem, error) {
 	query := `
 		SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
+			, COUNT(m.id)::int AS unread_count
 		FROM conversations c
 		INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+		LEFT JOIN messages m ON m.conversation_id = c.id
+			AND m.sender_id IS DISTINCT FROM $1
+			AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)
 		WHERE cp.user_id = $1
+		GROUP BY c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
 		ORDER BY c.updated_at DESC
 	`
 
@@ -159,9 +164,9 @@ func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UU
 	}
 	defer rows.Close()
 
-	conversations := make([]models.Conversation, 0)
+	conversations := make([]models.ConversationListItem, 0)
 	for rows.Next() {
-		conversation, err := scanConversation(rows)
+		conversation, err := scanConversationListItem(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -176,14 +181,19 @@ func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UU
 	return conversations, nil
 }
 
-func (r *ConversationRepository) SearchRoomsForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error) {
+func (r *ConversationRepository) SearchRoomsForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.ConversationListItem, error) {
 	sql := `
 		SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
+			, COUNT(m.id)::int AS unread_count
 		FROM conversations c
 		INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+		LEFT JOIN messages m ON m.conversation_id = c.id
+			AND m.sender_id IS DISTINCT FROM $1
+			AND (cp.last_read_at IS NULL OR m.created_at > cp.last_read_at)
 		WHERE cp.user_id = $1
 			AND c.type = $2
 			AND c.name ILIKE $3
+		GROUP BY c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
 		ORDER BY c.updated_at DESC
 	`
 
@@ -193,9 +203,9 @@ func (r *ConversationRepository) SearchRoomsForUser(ctx context.Context, userID 
 	}
 	defer rows.Close()
 
-	conversations := make([]models.Conversation, 0)
+	conversations := make([]models.ConversationListItem, 0)
 	for rows.Next() {
-		conversation, err := scanConversation(rows)
+		conversation, err := scanConversationListItem(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +240,7 @@ func (r *ConversationRepository) IsParticipant(ctx context.Context, conversation
 
 func (r *ConversationRepository) FindParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error) {
 	query := `
-		SELECT conversation_id, user_id, role, joined_at
+		SELECT conversation_id, user_id, role, joined_at, last_read_at
 		FROM conversation_participants
 		WHERE conversation_id = $1
 			AND user_id = $2
@@ -241,7 +251,7 @@ func (r *ConversationRepository) FindParticipant(ctx context.Context, conversati
 
 func (r *ConversationRepository) ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error) {
 	query := `
-		SELECT conversation_id, user_id, role, joined_at
+		SELECT conversation_id, user_id, role, joined_at, last_read_at
 		FROM conversation_participants
 		WHERE conversation_id = $1
 		ORDER BY joined_at ASC
@@ -276,7 +286,7 @@ func (r *ConversationRepository) AddParticipant(ctx context.Context, conversatio
 		VALUES ($1, $2, $3)
 		ON CONFLICT (conversation_id, user_id) DO UPDATE
 		SET role = conversation_participants.role
-		RETURNING conversation_id, user_id, role, joined_at
+		RETURNING conversation_id, user_id, role, joined_at, last_read_at
 	`
 
 	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
@@ -288,7 +298,7 @@ func (r *ConversationRepository) UpdateParticipantRole(ctx context.Context, conv
 		SET role = $3
 		WHERE conversation_id = $1
 			AND user_id = $2
-		RETURNING conversation_id, user_id, role, joined_at
+		RETURNING conversation_id, user_id, role, joined_at, last_read_at
 	`
 
 	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
@@ -303,6 +313,18 @@ func (r *ConversationRepository) RemoveParticipant(ctx context.Context, conversa
 
 	_, err := r.db.Exec(ctx, query, conversationID, userID)
 	return err
+}
+
+func (r *ConversationRepository) MarkRead(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error) {
+	query := `
+		UPDATE conversation_participants
+		SET last_read_at = NOW()
+		WHERE conversation_id = $1
+			AND user_id = $2
+		RETURNING conversation_id, user_id, role, joined_at, last_read_at
+	`
+
+	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID))
 }
 
 func (r *ConversationRepository) TransferOwnership(ctx context.Context, conversationID uuid.UUID, currentOwnerID uuid.UUID, newOwnerID uuid.UUID) (models.ConversationParticipant, error) {
@@ -327,7 +349,7 @@ func (r *ConversationRepository) TransferOwnership(ctx context.Context, conversa
 		SET role = $3
 		WHERE conversation_id = $1
 			AND user_id = $2
-		RETURNING conversation_id, user_id, role, joined_at
+		RETURNING conversation_id, user_id, role, joined_at, last_read_at
 	`
 	newOwner, err := scanConversationParticipant(tx.QueryRow(ctx, promoteQuery, conversationID, newOwnerID, models.ParticipantRoleOwner))
 	if err != nil {
@@ -356,6 +378,22 @@ func scanConversation(row pgx.Row) (models.Conversation, error) {
 	return conversation, err
 }
 
+func scanConversationListItem(row pgx.Row) (models.ConversationListItem, error) {
+	var item models.ConversationListItem
+
+	err := row.Scan(
+		&item.ID,
+		&item.Type,
+		&item.Name,
+		&item.CreatedBy,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+		&item.UnreadCount,
+	)
+
+	return item, err
+}
+
 func scanConversationParticipant(row pgx.Row) (models.ConversationParticipant, error) {
 	var participant models.ConversationParticipant
 
@@ -364,6 +402,7 @@ func scanConversationParticipant(row pgx.Row) (models.ConversationParticipant, e
 		&participant.UserID,
 		&participant.Role,
 		&participant.JoinedAt,
+		&participant.LastReadAt,
 	)
 
 	return participant, err

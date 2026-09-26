@@ -43,6 +43,7 @@ type ConversationParticipant struct {
 	UserID         uuid.UUID       `json:"user_id"`
 	Role           ParticipantRole `json:"role"`
 	JoinedAt       time.Time       `json:"joined_at"`
+	LastReadAt     *time.Time      `json:"last_read_at"`
 }
 
 type Message struct {
