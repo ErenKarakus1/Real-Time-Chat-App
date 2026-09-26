@@ -13,8 +13,8 @@ import (
 func main() {
 	cfg := config.Load()
 	gin.SetMode(cfg.GinMode)
-	if cfg.JWTSecret == "" {
-		log.Fatal("JWT_SECRET is required")
+	if err := cfg.ValidateServer(); err != nil {
+		log.Fatal(err)
 	}
 
 	ctx := context.Background()
