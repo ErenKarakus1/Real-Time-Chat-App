@@ -45,7 +45,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      CORS_ALLOWED_ORIGIN: http://localhost:5173
+      CORS_ALLOWED_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/real_time_chat?sslmode=disable
       GIN_MODE: debug
       JWT_SECRET: change-me-for-local-dev
