@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/auth"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/presence"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,14 +19,16 @@ type WebSocketConversationService interface {
 type WebSocketHandler struct {
 	conversations WebSocketConversationService
 	hub           *realtime.Hub
+	presence      *presence.Service
 	jwtSecret     string
 	upgrader      websocket.Upgrader
 }
 
-func NewWebSocketHandler(conversations WebSocketConversationService, hub *realtime.Hub, jwtSecret string) *WebSocketHandler {
+func NewWebSocketHandler(conversations WebSocketConversationService, hub *realtime.Hub, presence *presence.Service, jwtSecret string) *WebSocketHandler {
 	return &WebSocketHandler{
 		conversations: conversations,
 		hub:           hub,
+		presence:      presence,
 		jwtSecret:     jwtSecret,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -70,6 +73,12 @@ func (h *WebSocketHandler) Conversation(c *gin.Context) {
 	}
 
 	client := realtime.NewClient(conn)
+	if err := h.presence.Connect(c, userID); err != nil {
+		conn.Close()
+		return
+	}
+	defer h.presence.Disconnect(context.Background(), userID)
+
 	h.hub.Subscribe(c, conversationID, client)
 	defer h.hub.Unsubscribe(conversationID, client)
 

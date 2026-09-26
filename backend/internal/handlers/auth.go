@@ -8,6 +8,7 @@ import (
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/presence"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,7 +22,8 @@ type UserService interface {
 }
 
 type AuthHandler struct {
-	users UserService
+	users    UserService
+	presence *presence.Service
 }
 
 type registerRequest struct {
@@ -40,9 +42,15 @@ type loginResponse struct {
 	Token string              `json:"token"`
 }
 
-func NewAuthHandler(users UserService) *AuthHandler {
+type presenceResponse struct {
+	UserID uuid.UUID `json:"user_id"`
+	Online bool      `json:"online"`
+}
+
+func NewAuthHandler(users UserService, presence *presence.Service) *AuthHandler {
 	return &AuthHandler{
-		users: users,
+		users:    users,
+		presence: presence,
 	}
 }
 
@@ -142,6 +150,41 @@ func (h *AuthHandler) Search(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.NewUserResponses(users))
+}
+
+func (h *AuthHandler) Presence(c *gin.Context) {
+	ids := strings.Split(c.Query("ids"), ",")
+	userIDs := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+
+		userID, err := uuid.Parse(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ids must contain valid UUIDs"})
+			return
+		}
+
+		userIDs = append(userIDs, userID)
+	}
+
+	statuses, err := h.presence.Statuses(c, userIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get user presence"})
+		return
+	}
+
+	response := make([]presenceResponse, 0, len(userIDs))
+	for _, userID := range userIDs {
+		response = append(response, presenceResponse{
+			UserID: userID,
+			Online: statuses[userID],
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func validateRegisterRequest(req registerRequest) string {

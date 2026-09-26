@@ -8,6 +8,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/db"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/handlers"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/presence"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/repositories"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
@@ -35,9 +36,10 @@ func main() {
 	defer redisClient.Close()
 
 	router := gin.Default()
+	presenceService := presence.NewService(redisClient)
 	userRepository := repositories.NewUserRepository(dbPool)
 	userService := services.NewUserService(userRepository, cfg.JWTSecret)
-	authHandler := handlers.NewAuthHandler(userService)
+	authHandler := handlers.NewAuthHandler(userService, presenceService)
 	conversationRepository := repositories.NewConversationRepository(dbPool)
 	conversationService := services.NewConversationService(conversationRepository)
 	conversationHandler := handlers.NewConversationHandler(conversationService)
@@ -46,7 +48,7 @@ func main() {
 	realtimePubSub := realtime.NewRedisPubSub(redisClient)
 	realtimeHub := realtime.NewHub(realtimePubSub)
 	messageHandler := handlers.NewMessageHandler(messageService, realtimeHub)
-	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, cfg.JWTSecret)
+	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, presenceService, cfg.JWTSecret)
 	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
 	router.GET("/health", handlers.Health)
@@ -54,6 +56,7 @@ func main() {
 	router.POST("/auth/login", authHandler.Login)
 	router.GET("/auth/me", authMiddleware, authHandler.Me)
 	router.GET("/users/search", authMiddleware, authHandler.Search)
+	router.GET("/users/presence", authMiddleware, authHandler.Presence)
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
 	router.PATCH("/conversations/:conversation_id", authMiddleware, conversationHandler.UpdateRoomName)
 	router.DELETE("/conversations/:conversation_id", authMiddleware, conversationHandler.DeleteRoom)
