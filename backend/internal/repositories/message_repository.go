@@ -116,6 +116,16 @@ func (r *MessageRepository) UpdateContent(ctx context.Context, messageID uuid.UU
 	return scanMessage(r.db.QueryRow(ctx, query, messageID, content))
 }
 
+func (r *MessageRepository) Delete(ctx context.Context, messageID uuid.UUID) error {
+	query := `
+		DELETE FROM messages
+		WHERE id = $1
+	`
+
+	_, err := r.db.Exec(ctx, query, messageID)
+	return err
+}
+
 func scanMessage(row pgx.Row) (models.Message, error) {
 	var message models.Message
 

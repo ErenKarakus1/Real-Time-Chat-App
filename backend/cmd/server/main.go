@@ -66,6 +66,7 @@ func main() {
 	router.GET("/conversations/:conversation_id/messages", authMiddleware, messageHandler.List)
 	router.POST("/conversations/:conversation_id/messages", authMiddleware, messageHandler.Create)
 	router.PATCH("/conversations/:conversation_id/messages/:message_id", authMiddleware, messageHandler.Update)
+	router.DELETE("/conversations/:conversation_id/messages/:message_id", authMiddleware, messageHandler.Delete)
 	router.GET("/ws/conversations/:conversation_id", webSocketHandler.Conversation)
 
 	if err := router.Run(":" + cfg.Port); err != nil {

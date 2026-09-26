@@ -17,6 +17,7 @@ import (
 
 type MessageService interface {
 	Create(ctx context.Context, input services.CreateMessageInput) (models.Message, error)
+	Delete(ctx context.Context, input services.DeleteMessageInput) error
 	ListForConversation(ctx context.Context, input services.ListMessagesInput) ([]models.Message, error)
 	Update(ctx context.Context, input services.UpdateMessageInput) (models.Message, error)
 }
@@ -32,6 +33,11 @@ type createMessageRequest struct {
 
 type updateMessageRequest struct {
 	Content string `json:"content"`
+}
+
+type deletedMessageResponse struct {
+	ID             uuid.UUID `json:"id"`
+	ConversationID uuid.UUID `json:"conversation_id"`
 }
 
 func NewMessageHandler(messages MessageService, hub *realtime.Hub) *MessageHandler {
@@ -185,6 +191,53 @@ func (h *MessageHandler) Update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (h *MessageHandler) Delete(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	messageID, err := uuid.Parse(c.Param("message_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "message_id must be a valid UUID"})
+		return
+	}
+
+	err = h.messages.Delete(c, services.DeleteMessageInput{
+		ConversationID: conversationID,
+		MessageID:      messageID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrConversationAccessDenied) || errors.Is(err, services.ErrMessageOwnershipDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete message"})
+		return
+	}
+
+	response := deletedMessageResponse{
+		ID:             messageID,
+		ConversationID: conversationID,
+	}
+	if err := h.hub.Publish(c, conversationID, realtime.Event{
+		Type: realtime.EventMessageDeleted,
+		Data: response,
+	}); err != nil {
+		log.Printf("broadcast message delete: %v", err)
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func conversationIDParam(c *gin.Context) (uuid.UUID, bool) {

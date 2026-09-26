@@ -3,6 +3,7 @@ package realtime
 import "encoding/json"
 
 const EventMessageCreated = "message.created"
+const EventMessageDeleted = "message.deleted"
 const EventMessageUpdated = "message.updated"
 
 type Event struct {
