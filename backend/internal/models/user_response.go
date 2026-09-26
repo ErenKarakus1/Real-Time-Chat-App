@@ -23,3 +23,12 @@ func NewUserResponse(user User) UserResponse {
 		UpdatedAt: user.UpdatedAt,
 	}
 }
+
+func NewUserResponses(users []User) []UserResponse {
+	responses := make([]UserResponse, 0, len(users))
+	for _, user := range users {
+		responses = append(responses, NewUserResponse(user))
+	}
+
+	return responses
+}

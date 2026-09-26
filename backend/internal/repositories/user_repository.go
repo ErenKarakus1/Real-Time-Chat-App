@@ -49,6 +49,39 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (models.
 	return r.scanUser(r.db.QueryRow(ctx, query, email))
 }
 
+func (r *UserRepository) Search(ctx context.Context, query string, limit int) ([]models.User, error) {
+	sql := `
+		SELECT id, username, email, password_hash, created_at, updated_at
+		FROM users
+		WHERE username ILIKE $1
+			OR email ILIKE $1
+		ORDER BY username ASC
+		LIMIT $2
+	`
+
+	rows, err := r.db.Query(ctx, sql, "%"+query+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]models.User, 0)
+	for rows.Next() {
+		user, err := r.scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (r *UserRepository) scanUser(row pgx.Row) (models.User, error) {
 	var user models.User
 

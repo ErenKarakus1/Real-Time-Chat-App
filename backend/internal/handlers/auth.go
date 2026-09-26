@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
@@ -16,6 +17,7 @@ type UserService interface {
 	Register(ctx context.Context, input services.RegisterUserInput) (models.User, error)
 	Login(ctx context.Context, input services.LoginInput) (services.LoginResult, error)
 	FindByID(ctx context.Context, id uuid.UUID) (models.User, error)
+	Search(ctx context.Context, input services.SearchUsersInput) ([]models.User, error)
 }
 
 type AuthHandler struct {
@@ -119,6 +121,29 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, models.NewUserResponse(user))
 }
 
+func (h *AuthHandler) Search(c *gin.Context) {
+	limit, ok := positiveIntQuery(c, "limit")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be a positive integer"})
+		return
+	}
+
+	users, err := h.users.Search(c, services.SearchUsersInput{
+		Query: c.Query("q"),
+		Limit: limit,
+	})
+	if err == services.ErrInvalidUserSearchQuery {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not search users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewUserResponses(users))
+}
+
 func validateRegisterRequest(req registerRequest) string {
 	username := strings.TrimSpace(req.Username)
 	email := strings.TrimSpace(req.Email)
@@ -148,6 +173,20 @@ func validateRegisterRequest(req registerRequest) string {
 	}
 
 	return ""
+}
+
+func positiveIntQuery(c *gin.Context, key string) (int, bool) {
+	value := c.Query(key)
+	if value == "" {
+		return 0, true
+	}
+
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit <= 0 {
+		return 0, false
+	}
+
+	return limit, true
 }
 
 func validateLoginRequest(req loginRequest) string {

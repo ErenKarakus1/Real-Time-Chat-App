@@ -53,6 +53,7 @@ func main() {
 	router.POST("/auth/register", authHandler.Register)
 	router.POST("/auth/login", authHandler.Login)
 	router.GET("/auth/me", authMiddleware, authHandler.Me)
+	router.GET("/users/search", authMiddleware, authHandler.Search)
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
 	router.PATCH("/conversations/:conversation_id", authMiddleware, conversationHandler.UpdateRoomName)
 	router.DELETE("/conversations/:conversation_id", authMiddleware, conversationHandler.DeleteRoom)

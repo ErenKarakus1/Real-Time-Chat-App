@@ -10,10 +10,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	DefaultUserSearchLimit = 20
+	MaxUserSearchLimit     = 20
+	MinUserSearchLength    = 2
+)
+
 type UserRepository interface {
 	Create(ctx context.Context, user models.User) (models.User, error)
 	FindByID(ctx context.Context, id uuid.UUID) (models.User, error)
 	FindByEmail(ctx context.Context, email string) (models.User, error)
+	Search(ctx context.Context, query string, limit int) ([]models.User, error)
 }
 
 type UserService struct {
@@ -37,7 +44,13 @@ type LoginResult struct {
 	Token string
 }
 
+type SearchUsersInput struct {
+	Query string
+	Limit int
+}
+
 var ErrInvalidCredentials = errors.New("invalid credentials")
+var ErrInvalidUserSearchQuery = errors.New("search query must be at least 2 characters")
 
 func NewUserService(users UserRepository, jwtSecret string) *UserService {
 	return &UserService{
@@ -86,4 +99,21 @@ func (s *UserService) Login(ctx context.Context, input LoginInput) (LoginResult,
 
 func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (models.User, error) {
 	return s.users.FindByID(ctx, id)
+}
+
+func (s *UserService) Search(ctx context.Context, input SearchUsersInput) ([]models.User, error) {
+	query := strings.TrimSpace(input.Query)
+	if len(query) < MinUserSearchLength {
+		return nil, ErrInvalidUserSearchQuery
+	}
+
+	limit := input.Limit
+	if limit <= 0 {
+		limit = DefaultUserSearchLimit
+	}
+	if limit > MaxUserSearchLimit {
+		limit = MaxUserSearchLimit
+	}
+
+	return s.users.Search(ctx, query, limit)
 }
