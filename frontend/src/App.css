@@ -325,13 +325,25 @@ input:focus {
   background: #dcfce7;
 }
 
-.room-tools {
+.room-panel {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 10px;
+}
+
+.room-tools,
+.participant-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto auto;
   gap: 8px;
 }
 
-.room-tools button {
+.participant-form {
+  grid-template-columns: minmax(160px, 1fr) auto;
+}
+
+.room-tools button,
+.participant-form button,
+.participant-row button {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -343,9 +355,49 @@ input:focus {
   cursor: pointer;
 }
 
-.room-tools button:disabled {
+.room-tools button:disabled,
+.participant-form button:disabled,
+.participant-row button:disabled {
   cursor: wait;
   opacity: 0.6;
+}
+
+.participant-list {
+  display: grid;
+  gap: 6px;
+}
+
+.participant-list > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.participant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+
+.participant-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-row strong {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.participant-row button {
+  min-height: 32px;
 }
 
 .message-list {
@@ -509,7 +561,9 @@ input:focus {
     grid-template-columns: 1fr;
   }
 
-  .room-tools {
+  .room-tools,
+  .participant-form,
+  .participant-row {
     grid-template-columns: 1fr;
   }
 }

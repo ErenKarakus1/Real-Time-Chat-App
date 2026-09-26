@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import './App.css'
 import {
+  addParticipant,
   ApiError,
   createDirect,
   createMessage,
@@ -8,15 +9,19 @@ import {
   conversationWebSocketURL,
   deleteMessage,
   deleteRoom,
+  leaveRoom,
   listConversations,
   listMessages,
+  listParticipants,
   login,
   me,
   register,
+  removeParticipant,
   updateMessage,
   updateRoom,
   type Conversation,
   type Message,
+  type Participant,
   type RealtimeEvent,
   type User,
 } from './api'
@@ -84,6 +89,10 @@ function App() {
   const [typingUserIDs, setTypingUserIDs] = useState<string[]>([])
   const [roomNameDraft, setRoomNameDraft] = useState('')
   const [isUpdatingRoom, setIsUpdatingRoom] = useState(false)
+  const [participants, setParticipants] = useState<Participant[]>([])
+  const [participantUserID, setParticipantUserID] = useState('')
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
+  const [pendingParticipantID, setPendingParticipantID] = useState('')
   const socketRef = useRef<WebSocket | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
 
@@ -205,6 +214,54 @@ function App() {
       isCurrent = false
     }
   }, [token, selectedConversationID])
+
+  const selectedConversation = useMemo(
+    () =>
+      conversations.find(
+        (conversation) => conversation.id === selectedConversationID,
+      ) ?? null,
+    [conversations, selectedConversationID],
+  )
+
+  useEffect(() => {
+    if (!token || !selectedConversation || selectedConversation.type !== 'room') {
+      return
+    }
+
+    let isCurrent = true
+
+    Promise.resolve()
+      .then(() => {
+        if (isCurrent) {
+          setIsLoadingParticipants(true)
+        }
+
+        return listParticipants(token, selectedConversation.id)
+      })
+      .then((items) => {
+        if (isCurrent) {
+          setParticipants(items)
+        }
+      })
+      .catch((caughtError) => {
+        if (isCurrent) {
+          setConversationError(
+            caughtError instanceof ApiError
+              ? caughtError.message
+              : 'Could not load participants.',
+          )
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingParticipants(false)
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, selectedConversation])
 
   useEffect(() => {
     if (!token || !selectedConversationID) {
@@ -370,6 +427,9 @@ function App() {
     setPendingMessageID('')
     setTypingUserIDs([])
     setRoomNameDraft('')
+    setParticipants([])
+    setParticipantUserID('')
+    setPendingParticipantID('')
     stopTyping()
   }
 
@@ -388,6 +448,9 @@ function App() {
     setEditingContent('')
     setTypingUserIDs([])
     setRoomNameDraft(conversation.name ?? '')
+    setParticipants([])
+    setParticipantUserID('')
+    setPendingParticipantID('')
     stopTyping()
     setSelectedConversationID(conversation.id)
   }
@@ -442,6 +505,8 @@ function App() {
       setEditingContent('')
       setTypingUserIDs([])
       setRoomNameDraft(conversation.name ?? '')
+      setParticipants([])
+      setParticipantUserID('')
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -668,6 +733,100 @@ function App() {
     }
   }
 
+  async function handleAddParticipant(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    const userID = participantUserID.trim()
+    if (!userID) {
+      return
+    }
+
+    setPendingParticipantID(userID)
+    setConversationError('')
+
+    try {
+      const participant = await addParticipant(token, selectedConversationID, {
+        user_id: userID,
+      })
+      setParticipants((currentParticipants) => {
+        if (
+          currentParticipants.some(
+            (currentParticipant) => currentParticipant.user_id === participant.user_id,
+          )
+        ) {
+          return currentParticipants
+        }
+
+        return [...currentParticipants, participant]
+      })
+      setParticipantUserID('')
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not add participant.',
+      )
+    } finally {
+      setPendingParticipantID('')
+    }
+  }
+
+  async function handleRemoveParticipant(userID: string) {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setPendingParticipantID(userID)
+    setConversationError('')
+
+    try {
+      await removeParticipant(token, selectedConversationID, userID)
+      setParticipants((currentParticipants) =>
+        currentParticipants.filter((participant) => participant.user_id !== userID),
+      )
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not remove participant.',
+      )
+    } finally {
+      setPendingParticipantID('')
+    }
+  }
+
+  async function handleLeaveRoom() {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setIsUpdatingRoom(true)
+    setConversationError('')
+
+    try {
+      await leaveRoom(token, selectedConversationID)
+      setConversations((currentConversations) =>
+        currentConversations.filter(
+          (conversation) => conversation.id !== selectedConversationID,
+        ),
+      )
+      setSelectedConversationID('')
+      setMessages([])
+      setParticipants([])
+      setRoomNameDraft('')
+      setSocketStatus('idle')
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError ? caughtError.message : 'Could not leave room.',
+      )
+    } finally {
+      setIsUpdatingRoom(false)
+    }
+  }
+
   if (isBootstrapping) {
     return (
       <main className="auth-page">
@@ -681,10 +840,6 @@ function App() {
   }
 
   if (user) {
-    const selectedConversation = conversations.find(
-      (conversation) => conversation.id === selectedConversationID,
-    )
-
     return (
       <main className="app-shell">
         <aside className="sidebar" aria-label="Conversations">
@@ -803,32 +958,90 @@ function App() {
                 </div>
                 <h2>{conversationLabel(selectedConversation)}</h2>
                 {selectedConversation.type === 'room' && (
-                  <form className="room-tools" onSubmit={handleUpdateRoom}>
-                    <input
-                      aria-label="Room name"
-                      minLength={2}
-                      onChange={(event) => setRoomNameDraft(event.target.value)}
-                      type="text"
-                      value={roomNameDraft}
-                    />
-                    <button
-                      disabled={
-                        isUpdatingRoom ||
-                        !roomNameDraft.trim() ||
-                        roomNameDraft.trim() === selectedConversation.name
-                      }
-                      type="submit"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      disabled={isUpdatingRoom}
-                      type="button"
-                      onClick={handleDeleteRoom}
-                    >
-                      Delete
-                    </button>
-                  </form>
+                  <div className="room-panel">
+                    <form className="room-tools" onSubmit={handleUpdateRoom}>
+                      <input
+                        aria-label="Room name"
+                        minLength={2}
+                        onChange={(event) => setRoomNameDraft(event.target.value)}
+                        type="text"
+                        value={roomNameDraft}
+                      />
+                      <button
+                        disabled={
+                          isUpdatingRoom ||
+                          !roomNameDraft.trim() ||
+                          roomNameDraft.trim() === selectedConversation.name
+                        }
+                        type="submit"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        disabled={isUpdatingRoom}
+                        type="button"
+                        onClick={handleDeleteRoom}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        disabled={isUpdatingRoom}
+                        type="button"
+                        onClick={handleLeaveRoom}
+                      >
+                        Leave
+                      </button>
+                    </form>
+
+                    <form className="participant-form" onSubmit={handleAddParticipant}>
+                      <input
+                        aria-label="Participant user ID"
+                        onChange={(event) => setParticipantUserID(event.target.value)}
+                        placeholder="User UUID"
+                        type="text"
+                        value={participantUserID}
+                      />
+                      <button
+                        disabled={
+                          !participantUserID.trim() ||
+                          pendingParticipantID === participantUserID.trim()
+                        }
+                        type="submit"
+                      >
+                        Add
+                      </button>
+                    </form>
+
+                    <div className="participant-list">
+                      {isLoadingParticipants ? (
+                        <span>Loading members</span>
+                      ) : participants.length === 0 ? (
+                        <span>No members loaded</span>
+                      ) : (
+                        participants.map((participant) => (
+                          <div className="participant-row" key={participant.user_id}>
+                            <span>
+                              {participant.user_id === user.id
+                                ? 'You'
+                                : participant.user_id}
+                            </span>
+                            <strong>{participant.role}</strong>
+                            {participant.user_id !== user.id && (
+                              <button
+                                disabled={pendingParticipantID === participant.user_id}
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveParticipant(participant.user_id)
+                                }
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 

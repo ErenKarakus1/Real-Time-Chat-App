@@ -40,6 +40,14 @@ export type DeletedMessage = {
   conversation_id: string
 }
 
+export type Participant = {
+  conversation_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member'
+  joined_at: string
+  last_read_at: string | null
+}
+
 export type RealtimeEvent =
   | {
       type: 'message.created'
@@ -78,6 +86,10 @@ type CreateRoomInput = {
 
 type UpdateRoomInput = {
   name: string
+}
+
+type AddParticipantInput = {
+  user_id: string
 }
 
 type CreateDirectInput = {
@@ -173,6 +185,48 @@ export async function deleteRoom(
   conversationID: string,
 ): Promise<void> {
   await request<void>(`/conversations/${conversationID}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+}
+
+export async function listParticipants(
+  token: string,
+  conversationID: string,
+): Promise<Participant[]> {
+  return request<Participant[]>(`/conversations/${conversationID}/participants`, {
+    headers: authHeaders(token),
+  })
+}
+
+export async function addParticipant(
+  token: string,
+  conversationID: string,
+  input: AddParticipantInput,
+): Promise<Participant> {
+  return request<Participant>(`/conversations/${conversationID}/participants`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+export async function removeParticipant(
+  token: string,
+  conversationID: string,
+  userID: string,
+): Promise<void> {
+  await request<void>(`/conversations/${conversationID}/participants/${userID}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+}
+
+export async function leaveRoom(
+  token: string,
+  conversationID: string,
+): Promise<void> {
+  await request<void>(`/conversations/${conversationID}/participants/me`, {
     method: 'DELETE',
     headers: authHeaders(token),
   })
