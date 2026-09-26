@@ -18,6 +18,7 @@ import (
 type MessageService interface {
 	Create(ctx context.Context, input services.CreateMessageInput) (models.Message, error)
 	ListForConversation(ctx context.Context, input services.ListMessagesInput) ([]models.Message, error)
+	Update(ctx context.Context, input services.UpdateMessageInput) (models.Message, error)
 }
 
 type MessageHandler struct {
@@ -26,6 +27,10 @@ type MessageHandler struct {
 }
 
 type createMessageRequest struct {
+	Content string `json:"content"`
+}
+
+type updateMessageRequest struct {
 	Content string `json:"content"`
 }
 
@@ -125,6 +130,61 @@ func (h *MessageHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.NewMessageResponses(messages))
+}
+
+func (h *MessageHandler) Update(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	messageID, err := uuid.Parse(c.Param("message_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "message_id must be a valid UUID"})
+		return
+	}
+
+	var req updateMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	message, err := h.messages.Update(c, services.UpdateMessageInput{
+		ConversationID: conversationID,
+		MessageID:      messageID,
+		UserID:         userID,
+		Content:        req.Content,
+	})
+	if errors.Is(err, services.ErrConversationAccessDenied) || errors.Is(err, services.ErrMessageOwnershipDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrInvalidMessageContent) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update message"})
+		return
+	}
+
+	response := models.NewMessageResponse(message)
+	if err := h.hub.Publish(c, conversationID, realtime.Event{
+		Type: realtime.EventMessageUpdated,
+		Data: response,
+	}); err != nil {
+		log.Printf("broadcast message update: %v", err)
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func conversationIDParam(c *gin.Context) (uuid.UUID, bool) {

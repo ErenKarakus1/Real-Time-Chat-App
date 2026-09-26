@@ -94,6 +94,28 @@ func (r *MessageRepository) ListForConversation(ctx context.Context, conversatio
 	return messages, nil
 }
 
+func (r *MessageRepository) FindByID(ctx context.Context, messageID uuid.UUID) (models.Message, error) {
+	query := `
+		SELECT id, conversation_id, sender_id, content, created_at, updated_at
+		FROM messages
+		WHERE id = $1
+	`
+
+	return scanMessage(r.db.QueryRow(ctx, query, messageID))
+}
+
+func (r *MessageRepository) UpdateContent(ctx context.Context, messageID uuid.UUID, content string) (models.Message, error) {
+	query := `
+		UPDATE messages
+		SET content = $2,
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, conversation_id, sender_id, content, created_at, updated_at
+	`
+
+	return scanMessage(r.db.QueryRow(ctx, query, messageID, content))
+}
+
 func scanMessage(row pgx.Row) (models.Message, error) {
 	var message models.Message
 
