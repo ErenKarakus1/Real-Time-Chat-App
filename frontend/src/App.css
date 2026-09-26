@@ -77,6 +77,11 @@ h2 {
   box-shadow: 0 1px 4px rgb(15 23 42 / 0.08);
 }
 
+.mode-switch.compact button {
+  min-height: 34px;
+  font-size: 0.84rem;
+}
+
 .auth-form {
   display: grid;
   gap: 16px;
@@ -115,6 +120,11 @@ input:focus {
 .primary-button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.new-chat-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
 }
 
 .ghost-button {
@@ -188,6 +198,13 @@ input:focus {
   font-weight: 800;
 }
 
+.new-chat-form {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
 .brand-mark {
   width: 34px;
   height: 34px;
@@ -198,6 +215,49 @@ input:focus {
   background: var(--accent);
 }
 
+.conversation-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+}
+
+.conversation-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversation-item:hover,
+.conversation-item[data-active='true'] {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.conversation-item span {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-item small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .empty-list {
   display: grid;
   place-items: center;
@@ -206,6 +266,7 @@ input:focus {
   border-radius: 8px;
   color: var(--muted);
   font-weight: 700;
+  text-align: center;
 }
 
 .chat-stage {

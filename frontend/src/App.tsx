@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import './App.css'
-import { ApiError, login, me, register, type User } from './api'
+import {
+  ApiError,
+  createDirect,
+  createRoom,
+  listConversations,
+  login,
+  me,
+  register,
+  type Conversation,
+  type User,
+} from './api'
 
 const TOKEN_KEY = 'rtc_token'
 
@@ -12,10 +22,22 @@ type AuthForm = {
   password: string
 }
 
+type NewConversationForm = {
+  mode: Conversation['type']
+  roomName: string
+  otherUserID: string
+}
+
 const emptyForm: AuthForm = {
   username: '',
   email: '',
   password: '',
+}
+
+const emptyNewConversationForm: NewConversationForm = {
+  mode: 'direct',
+  roomName: '',
+  otherUserID: '',
 }
 
 function getStoredToken() {
@@ -31,6 +53,14 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [selectedConversationID, setSelectedConversationID] = useState('')
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
+  const [conversationError, setConversationError] = useState('')
+  const [newConversationForm, setNewConversationForm] = useState(
+    emptyNewConversationForm,
+  )
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
 
   useEffect(() => {
     if (!token) {
@@ -62,6 +92,48 @@ function App() {
       isCurrent = false
     }
   }, [token])
+
+  useEffect(() => {
+    if (!token || !user) {
+      return
+    }
+
+    let isCurrent = true
+
+    Promise.resolve()
+      .then(() => {
+        if (isCurrent) {
+          setIsLoadingConversations(true)
+          setConversationError('')
+        }
+
+        return listConversations(token)
+      })
+      .then((items) => {
+        if (isCurrent) {
+          setConversations(items)
+          setSelectedConversationID((currentID) => currentID || items[0]?.id || '')
+        }
+      })
+      .catch((caughtError) => {
+        if (isCurrent) {
+          setConversationError(
+            caughtError instanceof ApiError
+              ? caughtError.message
+              : 'Could not load conversations.',
+          )
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingConversations(false)
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, user])
 
   const title = useMemo(() => {
     if (isBootstrapping) {
@@ -128,6 +200,64 @@ function App() {
     setUser(null)
     setForm(emptyForm)
     setMode('login')
+    setConversations([])
+    setSelectedConversationID('')
+    setNewConversationForm(emptyNewConversationForm)
+    setConversationError('')
+  }
+
+  function conversationLabel(conversation: Conversation) {
+    if (conversation.name) {
+      return conversation.name
+    }
+
+    return conversation.type === 'direct' ? 'Direct message' : 'Room'
+  }
+
+  function updateNewConversationForm(
+    field: keyof NewConversationForm,
+    value: string,
+  ) {
+    setNewConversationForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }))
+  }
+
+  async function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token) {
+      return
+    }
+
+    setIsCreatingConversation(true)
+    setConversationError('')
+
+    try {
+      const conversation =
+        newConversationForm.mode === 'room'
+          ? await createRoom(token, { name: newConversationForm.roomName.trim() })
+          : await createDirect(token, {
+              other_user_id: newConversationForm.otherUserID.trim(),
+            })
+
+      setConversations((currentConversations) => {
+        const withoutDuplicate = currentConversations.filter(
+          (item) => item.id !== conversation.id,
+        )
+        return [conversation, ...withoutDuplicate]
+      })
+      setSelectedConversationID(conversation.id)
+      setNewConversationForm(emptyNewConversationForm)
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not create conversation.',
+      )
+    } finally {
+      setIsCreatingConversation(false)
+    }
   }
 
   if (isBootstrapping) {
@@ -143,6 +273,10 @@ function App() {
   }
 
   if (user) {
+    const selectedConversation = conversations.find(
+      (conversation) => conversation.id === selectedConversationID,
+    )
+
     return (
       <main className="app-shell">
         <aside className="sidebar" aria-label="Conversations">
@@ -152,10 +286,91 @@ function App() {
             </span>
             <span>Real Time Chat</span>
           </div>
-          <button className="new-chat-button" type="button">
-            New chat
-          </button>
-          <div className="empty-list">No conversations yet</div>
+          <form className="new-chat-form" onSubmit={handleCreateConversation}>
+            <div className="mode-switch compact" role="tablist" aria-label="New chat type">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={newConversationForm.mode === 'direct'}
+                onClick={() => updateNewConversationForm('mode', 'direct')}
+              >
+                DM
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={newConversationForm.mode === 'room'}
+                onClick={() => updateNewConversationForm('mode', 'room')}
+              >
+                Room
+              </button>
+            </div>
+
+            {newConversationForm.mode === 'room' ? (
+              <label>
+                Room name
+                <input
+                  minLength={2}
+                  onChange={(event) =>
+                    updateNewConversationForm('roomName', event.target.value)
+                  }
+                  placeholder="Backend team"
+                  required
+                  type="text"
+                  value={newConversationForm.roomName}
+                />
+              </label>
+            ) : (
+              <label>
+                User ID
+                <input
+                  onChange={(event) =>
+                    updateNewConversationForm('otherUserID', event.target.value)
+                  }
+                  placeholder="UUID"
+                  required
+                  type="text"
+                  value={newConversationForm.otherUserID}
+                />
+              </label>
+            )}
+
+            <button
+              className="new-chat-button"
+              disabled={isCreatingConversation}
+              type="submit"
+            >
+              {isCreatingConversation ? 'Creating' : 'New chat'}
+            </button>
+          </form>
+
+          {conversationError && (
+            <p className="form-message error">{conversationError}</p>
+          )}
+
+          <div className="conversation-list">
+            {isLoadingConversations ? (
+              <div className="empty-list">Loading conversations</div>
+            ) : conversations.length === 0 ? (
+              <div className="empty-list">No conversations yet</div>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  className="conversation-item"
+                  data-active={conversation.id === selectedConversationID}
+                  key={conversation.id}
+                  onClick={() => setSelectedConversationID(conversation.id)}
+                  type="button"
+                >
+                  <span>{conversationLabel(conversation)}</span>
+                  <small>
+                    {conversation.type === 'direct' ? 'DM' : 'Room'}
+                    {conversation.unread_count ? ` · ${conversation.unread_count}` : ''}
+                  </small>
+                </button>
+              ))
+            )}
+          </div>
         </aside>
 
         <section className="chat-stage" aria-label="Chat">
@@ -170,8 +385,14 @@ function App() {
           </header>
 
           <div className="empty-chat">
-            <p className="eyebrow">Ready</p>
-            <h2>Conversations land here next.</h2>
+            <p className="eyebrow">
+              {selectedConversation ? selectedConversation.type : 'Ready'}
+            </p>
+            <h2>
+              {selectedConversation
+                ? conversationLabel(selectedConversation)
+                : 'Create or choose a conversation.'}
+            </h2>
           </div>
         </section>
       </main>

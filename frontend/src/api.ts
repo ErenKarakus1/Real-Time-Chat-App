@@ -14,6 +14,16 @@ export type LoginResult = {
   token: string
 }
 
+export type Conversation = {
+  id: string
+  type: 'direct' | 'room'
+  name: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  unread_count?: number
+}
+
 type RegisterInput = {
   username: string
   email: string
@@ -23,6 +33,14 @@ type RegisterInput = {
 type LoginInput = {
   email: string
   password: string
+}
+
+type CreateRoomInput = {
+  name: string
+}
+
+type CreateDirectInput = {
+  other_user_id: string
 }
 
 type ApiErrorBody = {
@@ -59,6 +77,40 @@ export async function me(token: string): Promise<User> {
       Authorization: `Bearer ${token}`,
     },
   })
+}
+
+export async function listConversations(token: string): Promise<Conversation[]> {
+  return request<Conversation[]>('/conversations', {
+    headers: authHeaders(token),
+  })
+}
+
+export async function createRoom(
+  token: string,
+  input: CreateRoomInput,
+): Promise<Conversation> {
+  return request<Conversation>('/conversations/rooms', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+export async function createDirect(
+  token: string,
+  input: CreateDirectInput,
+): Promise<Conversation> {
+  return request<Conversation>('/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+function authHeaders(token: string) {
+  return {
+    Authorization: `Bearer ${token}`,
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
