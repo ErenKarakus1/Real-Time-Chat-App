@@ -33,6 +33,7 @@ type ConversationRepository interface {
 	ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error
+	SearchRoomsForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error)
 	TransferOwnership(ctx context.Context, conversationID uuid.UUID, currentOwnerID uuid.UUID, newOwnerID uuid.UUID) (models.ConversationParticipant, error)
 	UpdateRoomName(ctx context.Context, conversationID uuid.UUID, name string) (models.Conversation, error)
 	UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
@@ -143,6 +144,15 @@ func (s *ConversationService) CreateDirect(ctx context.Context, input CreateDire
 
 func (s *ConversationService) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
 	return s.conversations.ListForUser(ctx, userID)
+}
+
+func (s *ConversationService) SearchForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return s.conversations.ListForUser(ctx, userID)
+	}
+
+	return s.conversations.SearchRoomsForUser(ctx, userID, query)
 }
 
 func (s *ConversationService) AddRoomParticipant(ctx context.Context, input AddRoomParticipantInput) (models.ConversationParticipant, error) {

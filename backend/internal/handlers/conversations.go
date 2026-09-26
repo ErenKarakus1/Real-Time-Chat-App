@@ -21,6 +21,7 @@ type ConversationService interface {
 	ListParticipants(ctx context.Context, input services.ListParticipantsInput) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, input services.RemoveParticipantInput) error
+	SearchForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error)
 	TransferOwnership(ctx context.Context, input services.TransferOwnershipInput) (models.ConversationParticipant, error)
 	UpdateRoomName(ctx context.Context, input services.UpdateRoomNameInput) (models.Conversation, error)
 	UpdateParticipantRole(ctx context.Context, input services.UpdateParticipantRoleInput) (models.ConversationParticipant, error)
@@ -131,7 +132,7 @@ func (h *ConversationHandler) List(c *gin.Context) {
 		return
 	}
 
-	conversations, err := h.conversations.ListForUser(c, userID)
+	conversations, err := h.conversations.SearchForUser(c, userID, c.Query("q"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list conversations"})
 		return

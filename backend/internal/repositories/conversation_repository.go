@@ -176,6 +176,40 @@ func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UU
 	return conversations, nil
 }
 
+func (r *ConversationRepository) SearchRoomsForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Conversation, error) {
+	sql := `
+		SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at
+		FROM conversations c
+		INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+		WHERE cp.user_id = $1
+			AND c.type = $2
+			AND c.name ILIKE $3
+		ORDER BY c.updated_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, sql, userID, models.ConversationTypeRoom, "%"+query+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	conversations := make([]models.Conversation, 0)
+	for rows.Next() {
+		conversation, err := scanConversation(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		conversations = append(conversations, conversation)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return conversations, nil
+}
+
 func (r *ConversationRepository) IsParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (bool, error) {
 	query := `
 		SELECT EXISTS (
