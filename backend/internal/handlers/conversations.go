@@ -21,6 +21,7 @@ type ConversationService interface {
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, input services.RemoveParticipantInput) error
 	TransferOwnership(ctx context.Context, input services.TransferOwnershipInput) (models.ConversationParticipant, error)
+	UpdateRoomName(ctx context.Context, input services.UpdateRoomNameInput) (models.Conversation, error)
 	UpdateParticipantRole(ctx context.Context, input services.UpdateParticipantRoleInput) (models.ConversationParticipant, error)
 }
 
@@ -34,6 +35,10 @@ type createRoomRequest struct {
 
 type createDirectRequest struct {
 	OtherUserID string `json:"other_user_id"`
+}
+
+type updateRoomNameRequest struct {
+	Name string `json:"name"`
 }
 
 type addParticipantRequest struct {
@@ -132,6 +137,46 @@ func (h *ConversationHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.NewConversationResponses(conversations))
+}
+
+func (h *ConversationHandler) UpdateRoomName(c *gin.Context) {
+	actorID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	var req updateRoomNameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	conversation, err := h.conversations.UpdateRoomName(c, services.UpdateRoomNameInput{
+		ConversationID: conversationID,
+		ActorID:        actorID,
+		Name:           req.Name,
+	})
+	if errors.Is(err, services.ErrInvalidRoomName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update room"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewConversationResponse(conversation))
 }
 
 func (h *ConversationHandler) AddParticipant(c *gin.Context) {

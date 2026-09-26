@@ -122,6 +122,18 @@ func (r *ConversationRepository) FindByID(ctx context.Context, conversationID uu
 	return scanConversation(r.db.QueryRow(ctx, query, conversationID))
 }
 
+func (r *ConversationRepository) UpdateRoomName(ctx context.Context, conversationID uuid.UUID, name string) (models.Conversation, error) {
+	query := `
+		UPDATE conversations
+		SET name = $2,
+			updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, type, name, created_by, created_at, updated_at
+	`
+
+	return scanConversation(r.db.QueryRow(ctx, query, conversationID, name))
+}
+
 func (r *ConversationRepository) ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
 	query := `
 		SELECT c.id, c.type, c.name, c.created_by, c.created_at, c.updated_at

@@ -33,6 +33,7 @@ type ConversationRepository interface {
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error
 	TransferOwnership(ctx context.Context, conversationID uuid.UUID, currentOwnerID uuid.UUID, newOwnerID uuid.UUID) (models.ConversationParticipant, error)
+	UpdateRoomName(ctx context.Context, conversationID uuid.UUID, name string) (models.Conversation, error)
 	UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 }
 
@@ -83,6 +84,12 @@ type TransferOwnershipInput struct {
 	ConversationID uuid.UUID
 	ActorID        uuid.UUID
 	UserID         uuid.UUID
+}
+
+type UpdateRoomNameInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
+	Name           string
 }
 
 func NewConversationService(conversations ConversationRepository) *ConversationService {
@@ -299,4 +306,31 @@ func (s *ConversationService) TransferOwnership(ctx context.Context, input Trans
 	}
 
 	return s.conversations.TransferOwnership(ctx, input.ConversationID, input.ActorID, input.UserID)
+}
+
+func (s *ConversationService) UpdateRoomName(ctx context.Context, input UpdateRoomNameInput) (models.Conversation, error) {
+	name := strings.TrimSpace(input.Name)
+	if len(name) < minRoomNameLength || len(name) > maxRoomNameLength {
+		return models.Conversation{}, ErrInvalidRoomName
+	}
+
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return models.Conversation{}, err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return models.Conversation{}, ErrConversationManagementDenied
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return models.Conversation{}, err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner && actor.Role != models.ParticipantRoleAdmin {
+		return models.Conversation{}, ErrConversationManagementDenied
+	}
+
+	return s.conversations.UpdateRoomName(ctx, input.ConversationID, name)
 }

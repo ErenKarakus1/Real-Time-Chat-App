@@ -54,6 +54,7 @@ func main() {
 	router.POST("/auth/login", authHandler.Login)
 	router.GET("/auth/me", authMiddleware, authHandler.Me)
 	router.GET("/conversations", authMiddleware, conversationHandler.List)
+	router.PATCH("/conversations/:conversation_id", authMiddleware, conversationHandler.UpdateRoomName)
 	router.POST("/conversations/rooms", authMiddleware, conversationHandler.CreateRoom)
 	router.POST("/conversations/direct", authMiddleware, conversationHandler.CreateDirect)
 	router.PATCH("/conversations/:conversation_id/owner", authMiddleware, conversationHandler.TransferOwnership)
