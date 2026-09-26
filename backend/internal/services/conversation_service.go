@@ -32,6 +32,7 @@ type ConversationRepository interface {
 	ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error
+	TransferOwnership(ctx context.Context, conversationID uuid.UUID, currentOwnerID uuid.UUID, newOwnerID uuid.UUID) (models.ConversationParticipant, error)
 	UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 }
 
@@ -75,6 +76,12 @@ type RemoveParticipantInput struct {
 
 type LeaveRoomInput struct {
 	ConversationID uuid.UUID
+	UserID         uuid.UUID
+}
+
+type TransferOwnershipInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
 	UserID         uuid.UUID
 }
 
@@ -257,4 +264,39 @@ func (s *ConversationService) LeaveRoom(ctx context.Context, input LeaveRoomInpu
 	}
 
 	return s.conversations.RemoveParticipant(ctx, input.ConversationID, input.UserID)
+}
+
+func (s *ConversationService) TransferOwnership(ctx context.Context, input TransferOwnershipInput) (models.ConversationParticipant, error) {
+	if input.UserID == uuid.Nil || input.ActorID == uuid.Nil || input.UserID == input.ActorID {
+		return models.ConversationParticipant{}, ErrInvalidParticipant
+	}
+
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	target, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.UserID)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if target.Role == models.ParticipantRoleOwner {
+		return models.ConversationParticipant{}, ErrConversationManagementDenied
+	}
+
+	return s.conversations.TransferOwnership(ctx, input.ConversationID, input.ActorID, input.UserID)
 }

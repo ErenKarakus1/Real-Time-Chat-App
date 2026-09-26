@@ -20,6 +20,7 @@ type ConversationService interface {
 	ListParticipants(ctx context.Context, input services.ListParticipantsInput) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
 	RemoveParticipant(ctx context.Context, input services.RemoveParticipantInput) error
+	TransferOwnership(ctx context.Context, input services.TransferOwnershipInput) (models.ConversationParticipant, error)
 	UpdateParticipantRole(ctx context.Context, input services.UpdateParticipantRoleInput) (models.ConversationParticipant, error)
 }
 
@@ -41,6 +42,10 @@ type addParticipantRequest struct {
 
 type updateParticipantRoleRequest struct {
 	Role string `json:"role"`
+}
+
+type transferOwnershipRequest struct {
+	UserID string `json:"user_id"`
 }
 
 func NewConversationHandler(conversations ConversationService) *ConversationHandler {
@@ -322,6 +327,52 @@ func (h *ConversationHandler) LeaveRoom(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *ConversationHandler) TransferOwnership(c *gin.Context) {
+	actorID, ok := authenticatedUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authenticated user is required"})
+		return
+	}
+
+	conversationID, ok := conversationIDParam(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_id must be a valid UUID"})
+		return
+	}
+
+	var req transferOwnershipRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id must be a valid UUID"})
+		return
+	}
+
+	participant, err := h.conversations.TransferOwnership(c, services.TransferOwnershipInput{
+		ConversationID: conversationID,
+		ActorID:        actorID,
+		UserID:         userID,
+	})
+	if errors.Is(err, services.ErrInvalidParticipant) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrConversationManagementDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not transfer ownership"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.NewParticipantResponse(participant))
 }
 
 func authenticatedUserID(c *gin.Context) (uuid.UUID, bool) {

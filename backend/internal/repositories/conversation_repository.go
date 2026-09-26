@@ -249,6 +249,42 @@ func (r *ConversationRepository) RemoveParticipant(ctx context.Context, conversa
 	return err
 }
 
+func (r *ConversationRepository) TransferOwnership(ctx context.Context, conversationID uuid.UUID, currentOwnerID uuid.UUID, newOwnerID uuid.UUID) (models.ConversationParticipant, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	demoteQuery := `
+		UPDATE conversation_participants
+		SET role = $3
+		WHERE conversation_id = $1
+			AND user_id = $2
+	`
+	if _, err := tx.Exec(ctx, demoteQuery, conversationID, currentOwnerID, models.ParticipantRoleAdmin); err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	promoteQuery := `
+		UPDATE conversation_participants
+		SET role = $3
+		WHERE conversation_id = $1
+			AND user_id = $2
+		RETURNING conversation_id, user_id, role, joined_at
+	`
+	newOwner, err := scanConversationParticipant(tx.QueryRow(ctx, promoteQuery, conversationID, newOwnerID, models.ParticipantRoleOwner))
+	if err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return models.ConversationParticipant{}, err
+	}
+
+	return newOwner, nil
+}
+
 func scanConversation(row pgx.Row) (models.Conversation, error) {
 	var conversation models.Conversation
 
