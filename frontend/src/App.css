@@ -299,6 +299,30 @@ input:focus {
   border-bottom: 1px solid var(--line);
 }
 
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.socket-status {
+  display: inline-grid;
+  min-width: 64px;
+  place-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #92400e;
+  background: #fef3c7;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.socket-status[data-status='connected'] {
+  color: #166534;
+  background: #dcfce7;
+}
+
 .message-list {
   min-height: 0;
   display: flex;

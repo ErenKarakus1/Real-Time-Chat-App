@@ -5,6 +5,7 @@ import {
   createDirect,
   createMessage,
   createRoom,
+  conversationWebSocketURL,
   listConversations,
   listMessages,
   login,
@@ -12,6 +13,7 @@ import {
   register,
   type Conversation,
   type Message,
+  type RealtimeEvent,
   type User,
 } from './api'
 
@@ -69,6 +71,9 @@ function App() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [messageError, setMessageError] = useState('')
+  const [socketStatus, setSocketStatus] = useState<'idle' | 'connected' | 'offline'>(
+    'idle',
+  )
 
   useEffect(() => {
     if (!token) {
@@ -184,6 +189,72 @@ function App() {
     }
   }, [token, selectedConversationID])
 
+  useEffect(() => {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    const socket = new WebSocket(
+      conversationWebSocketURL(token, selectedConversationID),
+    )
+    let isCurrent = true
+
+    socket.addEventListener('open', () => {
+      if (isCurrent) {
+        setSocketStatus('connected')
+      }
+    })
+
+    socket.addEventListener('message', (event) => {
+      if (!isCurrent || typeof event.data !== 'string') {
+        return
+      }
+
+      let realtimeEvent: RealtimeEvent
+      try {
+        realtimeEvent = JSON.parse(event.data) as RealtimeEvent
+      } catch {
+        return
+      }
+      if (realtimeEvent.type === 'message.created') {
+        addMessage(realtimeEvent.data)
+        return
+      }
+
+      if (realtimeEvent.type === 'message.updated') {
+        setMessages((currentMessages) =>
+          currentMessages.map((message) =>
+            message.id === realtimeEvent.data.id ? realtimeEvent.data : message,
+          ),
+        )
+        return
+      }
+
+      if (realtimeEvent.type === 'message.deleted') {
+        setMessages((currentMessages) =>
+          currentMessages.filter((message) => message.id !== realtimeEvent.data.id),
+        )
+      }
+    })
+
+    socket.addEventListener('close', () => {
+      if (isCurrent) {
+        setSocketStatus('offline')
+      }
+    })
+
+    socket.addEventListener('error', () => {
+      if (isCurrent) {
+        setSocketStatus('offline')
+      }
+    })
+
+    return () => {
+      isCurrent = false
+      socket.close()
+    }
+  }, [token, selectedConversationID])
+
   const title = useMemo(() => {
     if (isBootstrapping) {
       return 'Opening your workspace'
@@ -256,6 +327,7 @@ function App() {
     setMessages([])
     setDraftMessage('')
     setMessageError('')
+    setSocketStatus('idle')
   }
 
   function conversationLabel(conversation: Conversation) {
@@ -274,6 +346,16 @@ function App() {
       ...currentForm,
       [field]: value,
     }))
+  }
+
+  function addMessage(message: Message) {
+    setMessages((currentMessages) => {
+      if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
+        return currentMessages
+      }
+
+      return [...currentMessages, message]
+    })
   }
 
   async function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
@@ -301,6 +383,7 @@ function App() {
       })
       setSelectedConversationID(conversation.id)
       setMessages([])
+      setSocketStatus('idle')
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -329,7 +412,7 @@ function App() {
 
     try {
       const message = await createMessage(token, selectedConversationID, { content })
-      setMessages((currentMessages) => [...currentMessages, message])
+      addMessage(message)
       setDraftMessage('')
     } catch (caughtError) {
       setMessageError(
@@ -450,6 +533,7 @@ function App() {
                   key={conversation.id}
                   onClick={() => {
                     setMessages([])
+                    setSocketStatus('idle')
                     setSelectedConversationID(conversation.id)
                   }}
                   type="button"
@@ -479,7 +563,12 @@ function App() {
           {selectedConversation ? (
             <div className="chat-panel">
               <div className="chat-title">
-                <p className="eyebrow">{selectedConversation.type}</p>
+                <div className="chat-title-row">
+                  <p className="eyebrow">{selectedConversation.type}</p>
+                  <span className="socket-status" data-status={socketStatus}>
+                    {socketStatus === 'connected' ? 'Live' : 'Offline'}
+                  </span>
+                </div>
                 <h2>{conversationLabel(selectedConversation)}</h2>
               </div>
 

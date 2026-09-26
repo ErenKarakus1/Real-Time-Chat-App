@@ -1,6 +1,8 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
 
+const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws')
+
 export type User = {
   id: string
   username: string
@@ -32,6 +34,32 @@ export type Message = {
   created_at: string
   updated_at: string
 }
+
+export type DeletedMessage = {
+  id: string
+  conversation_id: string
+}
+
+export type RealtimeEvent =
+  | {
+      type: 'message.created'
+      data: Message
+    }
+  | {
+      type: 'message.updated'
+      data: Message
+    }
+  | {
+      type: 'message.deleted'
+      data: DeletedMessage
+    }
+  | {
+      type: 'typing.started' | 'typing.stopped'
+      data: {
+        conversation_id: string
+        user_id: string
+      }
+    }
 
 type RegisterInput = {
   username: string
@@ -139,6 +167,11 @@ export async function createMessage(
     headers: authHeaders(token),
     body: JSON.stringify(input),
   })
+}
+
+export function conversationWebSocketURL(token: string, conversationID: string) {
+  const params = new URLSearchParams({ token })
+  return `${WS_BASE_URL}/ws/conversations/${conversationID}?${params.toString()}`
 }
 
 function authHeaders(token: string) {
