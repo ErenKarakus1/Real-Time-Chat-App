@@ -221,5 +221,9 @@ func (s *ConversationService) RemoveParticipant(ctx context.Context, input Remov
 		return ErrConversationManagementDenied
 	}
 
+	if actor.Role == models.ParticipantRoleAdmin && target.Role != models.ParticipantRoleMember {
+		return ErrConversationManagementDenied
+	}
+
 	return s.conversations.RemoveParticipant(ctx, input.ConversationID, input.UserID)
 }
