@@ -24,6 +24,15 @@ export type Conversation = {
   unread_count?: number
 }
 
+export type Message = {
+  id: string
+  conversation_id: string
+  sender_id: string | null
+  content: string
+  created_at: string
+  updated_at: string
+}
+
 type RegisterInput = {
   username: string
   email: string
@@ -41,6 +50,10 @@ type CreateRoomInput = {
 
 type CreateDirectInput = {
   other_user_id: string
+}
+
+type CreateMessageInput = {
+  content: string
 }
 
 type ApiErrorBody = {
@@ -101,6 +114,27 @@ export async function createDirect(
   input: CreateDirectInput,
 ): Promise<Conversation> {
   return request<Conversation>('/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  })
+}
+
+export async function listMessages(
+  token: string,
+  conversationID: string,
+): Promise<Message[]> {
+  return request<Message[]>(`/conversations/${conversationID}/messages`, {
+    headers: authHeaders(token),
+  })
+}
+
+export async function createMessage(
+  token: string,
+  conversationID: string,
+  input: CreateMessageInput,
+): Promise<Message> {
+  return request<Message>(`/conversations/${conversationID}/messages`, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify(input),

@@ -3,12 +3,15 @@ import './App.css'
 import {
   ApiError,
   createDirect,
+  createMessage,
   createRoom,
   listConversations,
+  listMessages,
   login,
   me,
   register,
   type Conversation,
+  type Message,
   type User,
 } from './api'
 
@@ -61,6 +64,11 @@ function App() {
     emptyNewConversationForm,
   )
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [draftMessage, setDraftMessage] = useState('')
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [messageError, setMessageError] = useState('')
 
   useEffect(() => {
     if (!token) {
@@ -135,6 +143,47 @@ function App() {
     }
   }, [token, user])
 
+  useEffect(() => {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    let isCurrent = true
+
+    Promise.resolve()
+      .then(() => {
+        if (isCurrent) {
+          setIsLoadingMessages(true)
+          setMessageError('')
+        }
+
+        return listMessages(token, selectedConversationID)
+      })
+      .then((items) => {
+        if (isCurrent) {
+          setMessages(items)
+        }
+      })
+      .catch((caughtError) => {
+        if (isCurrent) {
+          setMessageError(
+            caughtError instanceof ApiError
+              ? caughtError.message
+              : 'Could not load messages.',
+          )
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingMessages(false)
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, selectedConversationID])
+
   const title = useMemo(() => {
     if (isBootstrapping) {
       return 'Opening your workspace'
@@ -204,6 +253,9 @@ function App() {
     setSelectedConversationID('')
     setNewConversationForm(emptyNewConversationForm)
     setConversationError('')
+    setMessages([])
+    setDraftMessage('')
+    setMessageError('')
   }
 
   function conversationLabel(conversation: Conversation) {
@@ -248,6 +300,7 @@ function App() {
         return [conversation, ...withoutDuplicate]
       })
       setSelectedConversationID(conversation.id)
+      setMessages([])
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -258,6 +311,42 @@ function App() {
     } finally {
       setIsCreatingConversation(false)
     }
+  }
+
+  async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    const content = draftMessage.trim()
+    if (!content) {
+      return
+    }
+
+    setIsSendingMessage(true)
+    setMessageError('')
+
+    try {
+      const message = await createMessage(token, selectedConversationID, { content })
+      setMessages((currentMessages) => [...currentMessages, message])
+      setDraftMessage('')
+    } catch (caughtError) {
+      setMessageError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not send message.',
+      )
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }
+
+  function formatMessageTime(value: string) {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value))
   }
 
   if (isBootstrapping) {
@@ -359,13 +448,16 @@ function App() {
                   className="conversation-item"
                   data-active={conversation.id === selectedConversationID}
                   key={conversation.id}
-                  onClick={() => setSelectedConversationID(conversation.id)}
+                  onClick={() => {
+                    setMessages([])
+                    setSelectedConversationID(conversation.id)
+                  }}
                   type="button"
                 >
                   <span>{conversationLabel(conversation)}</span>
                   <small>
                     {conversation.type === 'direct' ? 'DM' : 'Room'}
-                    {conversation.unread_count ? ` · ${conversation.unread_count}` : ''}
+                    {conversation.unread_count ? ` - ${conversation.unread_count}` : ''}
                   </small>
                 </button>
               ))
@@ -384,16 +476,69 @@ function App() {
             </button>
           </header>
 
-          <div className="empty-chat">
-            <p className="eyebrow">
-              {selectedConversation ? selectedConversation.type : 'Ready'}
-            </p>
-            <h2>
-              {selectedConversation
-                ? conversationLabel(selectedConversation)
-                : 'Create or choose a conversation.'}
-            </h2>
-          </div>
+          {selectedConversation ? (
+            <div className="chat-panel">
+              <div className="chat-title">
+                <p className="eyebrow">{selectedConversation.type}</p>
+                <h2>{conversationLabel(selectedConversation)}</h2>
+              </div>
+
+              <div className="message-list" aria-live="polite">
+                {isLoadingMessages ? (
+                  <div className="empty-chat">
+                    <p className="eyebrow">Loading</p>
+                    <h2>Messages are coming in.</h2>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="empty-chat">
+                    <p className="eyebrow">No messages</p>
+                    <h2>Start the conversation.</h2>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const isOwnMessage = message.sender_id === user.id
+
+                    return (
+                      <article
+                        className="message-bubble"
+                        data-own={isOwnMessage}
+                        key={message.id}
+                      >
+                        <p>{message.content}</p>
+                        <time dateTime={message.created_at}>
+                          {formatMessageTime(message.created_at)}
+                        </time>
+                      </article>
+                    )
+                  })
+                )}
+              </div>
+
+              {messageError && <p className="form-message error">{messageError}</p>}
+
+              <form className="composer" onSubmit={handleSendMessage}>
+                <input
+                  aria-label="Message"
+                  onChange={(event) => setDraftMessage(event.target.value)}
+                  placeholder="Write a message"
+                  type="text"
+                  value={draftMessage}
+                />
+                <button
+                  className="primary-button"
+                  disabled={isSendingMessage || !draftMessage.trim()}
+                  type="submit"
+                >
+                  {isSendingMessage ? 'Sending' : 'Send'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="empty-chat">
+              <p className="eyebrow">Ready</p>
+              <h2>Create or choose a conversation.</h2>
+            </div>
+          )}
         </section>
       </main>
     )
