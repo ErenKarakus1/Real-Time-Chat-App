@@ -25,6 +25,7 @@ type ConversationRepository interface {
 	AddParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 	CreateDirect(ctx context.Context, conversation models.Conversation, userID uuid.UUID, otherUserID uuid.UUID) (models.Conversation, error)
 	CreateRoom(ctx context.Context, conversation models.Conversation, creatorID uuid.UUID) (models.Conversation, error)
+	DeleteConversation(ctx context.Context, conversationID uuid.UUID) error
 	FindByID(ctx context.Context, conversationID uuid.UUID) (models.Conversation, error)
 	FindDirectBetweenUsers(ctx context.Context, userID uuid.UUID, otherUserID uuid.UUID) (models.Conversation, error)
 	FindParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (models.ConversationParticipant, error)
@@ -90,6 +91,11 @@ type UpdateRoomNameInput struct {
 	ConversationID uuid.UUID
 	ActorID        uuid.UUID
 	Name           string
+}
+
+type DeleteRoomInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
 }
 
 func NewConversationService(conversations ConversationRepository) *ConversationService {
@@ -333,4 +339,26 @@ func (s *ConversationService) UpdateRoomName(ctx context.Context, input UpdateRo
 	}
 
 	return s.conversations.UpdateRoomName(ctx, input.ConversationID, name)
+}
+
+func (s *ConversationService) DeleteRoom(ctx context.Context, input DeleteRoomInput) error {
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return ErrConversationManagementDenied
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner {
+		return ErrConversationManagementDenied
+	}
+
+	return s.conversations.DeleteConversation(ctx, input.ConversationID)
 }

@@ -122,6 +122,16 @@ func (r *ConversationRepository) FindByID(ctx context.Context, conversationID uu
 	return scanConversation(r.db.QueryRow(ctx, query, conversationID))
 }
 
+func (r *ConversationRepository) DeleteConversation(ctx context.Context, conversationID uuid.UUID) error {
+	query := `
+		DELETE FROM conversations
+		WHERE id = $1
+	`
+
+	_, err := r.db.Exec(ctx, query, conversationID)
+	return err
+}
+
 func (r *ConversationRepository) UpdateRoomName(ctx context.Context, conversationID uuid.UUID, name string) (models.Conversation, error) {
 	query := `
 		UPDATE conversations
