@@ -31,6 +31,7 @@ type ConversationRepository interface {
 	IsParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) (bool, error)
 	ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	RemoveParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error
 	UpdateParticipantRole(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID, role models.ParticipantRole) (models.ConversationParticipant, error)
 }
 
@@ -64,6 +65,12 @@ type UpdateParticipantRoleInput struct {
 	ActorID        uuid.UUID
 	UserID         uuid.UUID
 	Role           models.ParticipantRole
+}
+
+type RemoveParticipantInput struct {
+	ConversationID uuid.UUID
+	ActorID        uuid.UUID
+	UserID         uuid.UUID
 }
 
 func NewConversationService(conversations ConversationRepository) *ConversationService {
@@ -180,4 +187,39 @@ func (s *ConversationService) UpdateParticipantRole(ctx context.Context, input U
 	}
 
 	return s.conversations.UpdateParticipantRole(ctx, input.ConversationID, input.UserID, input.Role)
+}
+
+func (s *ConversationService) RemoveParticipant(ctx context.Context, input RemoveParticipantInput) error {
+	if input.UserID == uuid.Nil || input.ActorID == uuid.Nil || input.UserID == input.ActorID {
+		return ErrInvalidParticipant
+	}
+
+	conversation, err := s.conversations.FindByID(ctx, input.ConversationID)
+	if err != nil {
+		return err
+	}
+
+	if conversation.Type != models.ConversationTypeRoom {
+		return ErrConversationManagementDenied
+	}
+
+	actor, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.ActorID)
+	if err != nil {
+		return err
+	}
+
+	if actor.Role != models.ParticipantRoleOwner && actor.Role != models.ParticipantRoleAdmin {
+		return ErrConversationManagementDenied
+	}
+
+	target, err := s.conversations.FindParticipant(ctx, input.ConversationID, input.UserID)
+	if err != nil {
+		return err
+	}
+
+	if target.Role == models.ParticipantRoleOwner {
+		return ErrConversationManagementDenied
+	}
+
+	return s.conversations.RemoveParticipant(ctx, input.ConversationID, input.UserID)
 }

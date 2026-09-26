@@ -238,6 +238,17 @@ func (r *ConversationRepository) UpdateParticipantRole(ctx context.Context, conv
 	return scanConversationParticipant(r.db.QueryRow(ctx, query, conversationID, userID, role))
 }
 
+func (r *ConversationRepository) RemoveParticipant(ctx context.Context, conversationID uuid.UUID, userID uuid.UUID) error {
+	query := `
+		DELETE FROM conversation_participants
+		WHERE conversation_id = $1
+			AND user_id = $2
+	`
+
+	_, err := r.db.Exec(ctx, query, conversationID, userID)
+	return err
+}
+
 func scanConversation(row pgx.Row) (models.Conversation, error) {
 	var conversation models.Conversation
 

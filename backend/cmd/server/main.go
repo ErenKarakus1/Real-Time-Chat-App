@@ -59,6 +59,7 @@ func main() {
 	router.GET("/conversations/:conversation_id/participants", authMiddleware, conversationHandler.ListParticipants)
 	router.POST("/conversations/:conversation_id/participants", authMiddleware, conversationHandler.AddParticipant)
 	router.PATCH("/conversations/:conversation_id/participants/:user_id/role", authMiddleware, conversationHandler.UpdateParticipantRole)
+	router.DELETE("/conversations/:conversation_id/participants/:user_id", authMiddleware, conversationHandler.RemoveParticipant)
 	router.GET("/conversations/:conversation_id/messages", authMiddleware, messageHandler.List)
 	router.POST("/conversations/:conversation_id/messages", authMiddleware, messageHandler.Create)
 	router.GET("/ws/conversations/:conversation_id", webSocketHandler.Conversation)
