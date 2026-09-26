@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/config"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/handlers"
 	"github.com/gin-gonic/gin"
 )
@@ -60,5 +63,28 @@ func TestRegisterRoutes(t *testing.T) {
 
 	if len(routes) != len(expectedRoutes) {
 		t.Fatalf("registered %d routes, want %d", len(routes), len(expectedRoutes))
+	}
+}
+
+func TestNewRouterAllowsConfiguredCORSOrigin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	origin := "http://localhost:5173"
+	router := NewRouter(config.Config{
+		JWTSecret:         "test-secret",
+		CORSAllowedOrigin: origin,
+	}, nil, nil)
+
+	request := httptest.NewRequest(http.MethodOptions, "/auth/login", nil)
+	request.Header.Set("Origin", origin)
+	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	recorder := httptest.NewRecorder()
+
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != origin {
+		t.Fatalf("allow origin = %q, want %q", got, origin)
 	}
 }

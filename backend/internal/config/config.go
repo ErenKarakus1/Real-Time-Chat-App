@@ -9,22 +9,24 @@ import (
 )
 
 type Config struct {
-	Port        string
-	GinMode     string
-	DatabaseURL string
-	RedisURL    string
-	JWTSecret   string
+	Port              string
+	GinMode           string
+	DatabaseURL       string
+	RedisURL          string
+	JWTSecret         string
+	CORSAllowedOrigin string
 }
 
 func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:        getEnv("PORT", "8080"),
-		GinMode:     getEnv("GIN_MODE", "debug"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		RedisURL:    getEnv("REDIS_URL", ""),
-		JWTSecret:   getEnv("JWT_SECRET", ""),
+		Port:              getEnv("PORT", "8080"),
+		GinMode:           getEnv("GIN_MODE", "debug"),
+		DatabaseURL:       getEnv("DATABASE_URL", ""),
+		RedisURL:          getEnv("REDIS_URL", ""),
+		JWTSecret:         getEnv("JWT_SECRET", ""),
+		CORSAllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:5173"),
 	}
 }
 

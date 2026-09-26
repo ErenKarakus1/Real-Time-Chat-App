@@ -11,6 +11,7 @@ import (
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/repositories"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -18,6 +19,13 @@ import (
 
 func NewRouter(cfg config.Config, dbPool *pgxpool.Pool, redisClient *redis.Client) *gin.Engine {
 	router := gin.Default()
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{cfg.CORSAllowedOrigin},
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	presenceService := presence.NewService(redisClient)
 	userRepository := repositories.NewUserRepository(dbPool)
