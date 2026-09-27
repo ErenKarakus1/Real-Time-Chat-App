@@ -26,7 +26,9 @@ import {
   register,
   removeParticipant,
   searchUsers,
+  transferOwnership,
   updateMessage,
+  updateParticipantRole,
   updateRoom,
   type Conversation,
   type Message,
@@ -311,6 +313,16 @@ function App() {
       ) ?? null,
     [conversations, selectedConversationID],
   )
+
+  const currentParticipant = useMemo(
+    () => participants.find((participant) => participant.user_id === user?.id) ?? null,
+    [participants, user?.id],
+  )
+
+  const canManageRoom = currentParticipant?.role === 'owner'
+  const canManageMembers =
+    currentParticipant?.role === 'owner' || currentParticipant?.role === 'admin'
+  const canLeaveRoom = Boolean(currentParticipant && currentParticipant.role !== 'owner')
 
   useEffect(() => {
     if (!token || !selectedConversation) {
@@ -692,6 +704,26 @@ function App() {
     return participant.username || participant.email || participant.user_id
   }
 
+  function canRemoveParticipant(participant: Participant) {
+    if (!currentParticipant || participant.user_id === user?.id) {
+      return false
+    }
+
+    if (currentParticipant.role === 'owner') {
+      return participant.role !== 'owner'
+    }
+
+    return currentParticipant.role === 'admin' && participant.role === 'member'
+  }
+
+  function canChangeParticipantRole(participant: Participant) {
+    return (
+      currentParticipant?.role === 'owner' &&
+      participant.user_id !== user?.id &&
+      participant.role !== 'owner'
+    )
+  }
+
   function typingLabel() {
     const names = typingUserIDs.map((userID) => {
       const participant = participants.find((item) => item.user_id === userID)
@@ -1065,6 +1097,76 @@ function App() {
     }
   }
 
+  async function handleUpdateParticipantRole(
+    participant: Participant,
+    role: 'admin' | 'member',
+  ) {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setPendingParticipantID(participant.user_id)
+    setConversationError('')
+
+    try {
+      const updatedParticipant = await updateParticipantRole(
+        token,
+        selectedConversationID,
+        participant.user_id,
+        { role },
+      )
+      setParticipants((currentParticipants) =>
+        currentParticipants.map((currentParticipant) =>
+          currentParticipant.user_id === updatedParticipant.user_id
+            ? updatedParticipant
+            : currentParticipant,
+        ),
+      )
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not update participant role.',
+      )
+    } finally {
+      setPendingParticipantID('')
+    }
+  }
+
+  async function handleTransferOwnership(participant: Participant) {
+    if (!token || !selectedConversationID) {
+      return
+    }
+
+    setPendingParticipantID(participant.user_id)
+    setConversationError('')
+
+    try {
+      const newOwner = await transferOwnership(token, selectedConversationID, {
+        user_id: participant.user_id,
+      })
+      setParticipants((currentParticipants) =>
+        currentParticipants.map((currentParticipant) => {
+          if (currentParticipant.user_id === user?.id) {
+            return { ...currentParticipant, role: 'admin' }
+          }
+
+          return currentParticipant.user_id === newOwner.user_id
+            ? newOwner
+            : currentParticipant
+        }),
+      )
+    } catch (caughtError) {
+      setConversationError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not transfer ownership.',
+      )
+    } finally {
+      setPendingParticipantID('')
+    }
+  }
+
   async function handleLeaveRoom() {
     if (!token || !selectedConversationID) {
       return
@@ -1265,67 +1367,77 @@ function App() {
                 <h2>{conversationLabel(selectedConversation)}</h2>
                 {selectedConversation.type === 'room' && (
                   <div className="room-panel">
-                    <form className="room-tools" onSubmit={handleUpdateRoom}>
-                      <input
-                        aria-label="Room name"
-                        minLength={2}
-                        onChange={(event) => setRoomNameDraft(event.target.value)}
-                        type="text"
-                        value={roomNameDraft}
-                      />
-                      <button
-                        disabled={
-                          isUpdatingRoom ||
-                          !roomNameDraft.trim() ||
-                          roomNameDraft.trim() === selectedConversation.name
-                        }
-                        type="submit"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        disabled={isUpdatingRoom}
-                        type="button"
-                        onClick={handleDeleteRoom}
-                      >
-                        Delete
-                      </button>
-                      <button
-                        disabled={isUpdatingRoom}
-                        type="button"
-                        onClick={handleLeaveRoom}
-                      >
-                        Leave
-                      </button>
-                    </form>
+                    <div className="room-tools-stack">
+                      {canManageRoom && (
+                        <form className="room-tools" onSubmit={handleUpdateRoom}>
+                          <input
+                            aria-label="Room name"
+                            minLength={2}
+                            onChange={(event) => setRoomNameDraft(event.target.value)}
+                            type="text"
+                            value={roomNameDraft}
+                          />
+                          <button
+                            disabled={
+                              isUpdatingRoom ||
+                              !roomNameDraft.trim() ||
+                              roomNameDraft.trim() === selectedConversation.name
+                            }
+                            type="submit"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            disabled={isUpdatingRoom}
+                            type="button"
+                            onClick={handleDeleteRoom}
+                          >
+                            Delete
+                          </button>
+                        </form>
+                      )}
 
-                    <form className="participant-form" onSubmit={handleAddParticipant}>
-                      <input
-                        aria-label="Participant"
-                        onChange={(event) => {
-                          const value = event.target.value
-                          setParticipantSearch(value)
-                          if (value.trim().length < 2) {
-                            setParticipantSearchResults([])
+                      {canLeaveRoom && (
+                        <button
+                          className="room-action-button"
+                          disabled={isUpdatingRoom}
+                          type="button"
+                          onClick={handleLeaveRoom}
+                        >
+                          Leave
+                        </button>
+                      )}
+                    </div>
+
+                    {canManageMembers && (
+                      <form className="participant-form" onSubmit={handleAddParticipant}>
+                        <input
+                          aria-label="Participant"
+                          onChange={(event) => {
+                            const value = event.target.value
+                            setParticipantSearch(value)
+                            if (value.trim().length < 2) {
+                              setParticipantSearchResults([])
+                            }
+                            setParticipantUserID('')
+                          }}
+                          placeholder="Search username or email"
+                          type="search"
+                          value={participantSearch}
+                        />
+                        <button
+                          disabled={
+                            !participantUserID ||
+                            pendingParticipantID === participantUserID
                           }
-                          setParticipantUserID('')
-                        }}
-                        placeholder="Search username or email"
-                        type="search"
-                        value={participantSearch}
-                      />
-                      <button
-                        disabled={
-                          !participantUserID ||
-                          pendingParticipantID === participantUserID
-                        }
-                        type="submit"
-                      >
-                        Add
-                      </button>
-                    </form>
+                          type="submit"
+                        >
+                          Add
+                        </button>
+                      </form>
+                    )}
 
-                    {participantSearchResults.length > 0 && (
+                    {canManageMembers && participantSearchResults.length > 0 && (
                       <div className="user-results">
                         {participantSearchResults.map((result) => (
                           <button
@@ -1351,16 +1463,65 @@ function App() {
                               {participantLabel(participant)}
                             </span>
                             <strong>{participant.role}</strong>
-                            {participant.user_id !== user.id && (
-                              <button
-                                disabled={pendingParticipantID === participant.user_id}
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveParticipant(participant.user_id)
-                                }
-                              >
-                                Remove
-                              </button>
+                            {(canChangeParticipantRole(participant) ||
+                              canRemoveParticipant(participant)) && (
+                              <div className="participant-actions">
+                                {canChangeParticipantRole(participant) && (
+                                  <>
+                                    {participant.role === 'member' ? (
+                                      <button
+                                        disabled={
+                                          pendingParticipantID === participant.user_id
+                                        }
+                                        type="button"
+                                        onClick={() =>
+                                          handleUpdateParticipantRole(
+                                            participant,
+                                            'admin',
+                                          )
+                                        }
+                                      >
+                                        Make admin
+                                      </button>
+                                    ) : (
+                                      <button
+                                        disabled={
+                                          pendingParticipantID === participant.user_id
+                                        }
+                                        type="button"
+                                        onClick={() =>
+                                          handleUpdateParticipantRole(
+                                            participant,
+                                            'member',
+                                          )
+                                        }
+                                      >
+                                        Make member
+                                      </button>
+                                    )}
+                                    <button
+                                      disabled={
+                                        pendingParticipantID === participant.user_id
+                                      }
+                                      type="button"
+                                      onClick={() => handleTransferOwnership(participant)}
+                                    >
+                                      Make owner
+                                    </button>
+                                  </>
+                                )}
+                                {canRemoveParticipant(participant) && (
+                                  <button
+                                    disabled={pendingParticipantID === participant.user_id}
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveParticipant(participant.user_id)
+                                    }
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         ))

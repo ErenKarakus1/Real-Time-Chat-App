@@ -98,6 +98,14 @@ type AddParticipantInput = {
   user_id: string
 }
 
+type UpdateParticipantRoleInput = {
+  role: 'admin' | 'member'
+}
+
+type TransferOwnershipInput = {
+  user_id: string
+}
+
 type CreateDirectInput = {
   other_user_id: string
 }
@@ -243,6 +251,34 @@ export async function removeParticipant(
   await request<void>(`/conversations/${conversationID}/participants/${userID}`, {
     method: 'DELETE',
     headers: authHeaders(token),
+  })
+}
+
+export async function updateParticipantRole(
+  token: string,
+  conversationID: string,
+  userID: string,
+  input: UpdateParticipantRoleInput,
+): Promise<Participant> {
+  return request<Participant>(
+    `/conversations/${conversationID}/participants/${userID}/role`,
+    {
+      method: 'PATCH',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export async function transferOwnership(
+  token: string,
+  conversationID: string,
+  input: TransferOwnershipInput,
+): Promise<Participant> {
+  return request<Participant>(`/conversations/${conversationID}/owner`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
   })
 }
 

@@ -456,10 +456,15 @@ button:hover:not(:disabled) {
   background: var(--canvas);
 }
 
+.room-tools-stack {
+  display: grid;
+  gap: 8px;
+}
+
 .room-tools,
 .participant-form {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto auto auto;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
   gap: 8px;
 }
 
@@ -468,8 +473,9 @@ button:hover:not(:disabled) {
 }
 
 .room-tools button,
+.room-action-button,
 .participant-form button,
-.participant-row button {
+.participant-actions button {
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -482,17 +488,23 @@ button:hover:not(:disabled) {
 }
 
 .room-tools button:hover:not(:disabled),
+.room-action-button:hover:not(:disabled),
 .participant-form button:hover:not(:disabled),
-.participant-row button:hover:not(:disabled) {
+.participant-actions button:hover:not(:disabled) {
   border-color: var(--line-strong);
   background: #eef3ef;
 }
 
 .room-tools button:disabled,
+.room-action-button:disabled,
 .participant-form button:disabled,
-.participant-row button:disabled {
+.participant-actions button:disabled {
   cursor: wait;
   opacity: 0.6;
+}
+
+.room-action-button {
+  width: fit-content;
 }
 
 .participant-list {
@@ -510,7 +522,7 @@ button:hover:not(:disabled) {
 
 .participant-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 8px;
@@ -531,7 +543,14 @@ button:hover:not(:disabled) {
   text-transform: uppercase;
 }
 
-.participant-row button {
+.participant-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.participant-actions button {
   min-height: 32px;
 }
 
@@ -720,11 +739,8 @@ button:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 
-  .participant-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .participant-row button {
-    grid-column: 1 / -1;
+  .participant-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
