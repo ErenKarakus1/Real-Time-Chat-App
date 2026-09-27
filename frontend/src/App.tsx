@@ -90,6 +90,7 @@ function App() {
   )
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
+  const [messagesConversationID, setMessagesConversationID] = useState('')
   const [draftMessage, setDraftMessage] = useState('')
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false)
@@ -256,6 +257,7 @@ function App() {
       .then((items) => {
         if (isCurrent) {
           setMessages(items)
+          setMessagesConversationID(selectedConversationID)
           setHasOlderMessages(items.length === MESSAGE_PAGE_SIZE)
         }
       })
@@ -503,6 +505,7 @@ function App() {
 
       if (realtimeEvent.type === 'message.created') {
         if (conversationID === currentSelectedConversationID) {
+          setMessagesConversationID(conversationID)
           setMessages((currentMessages) => {
             if (
               currentMessages.some(
@@ -761,6 +764,7 @@ function App() {
     setConversationError('')
     setConversationSearch('')
     setMessages([])
+    setMessagesConversationID('')
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -818,7 +822,12 @@ function App() {
   }
 
   function selectConversation(conversation: Conversation) {
+    if (conversation.id === selectedConversationID) {
+      return
+    }
+
     setMessages([])
+    setMessagesConversationID('')
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -1050,6 +1059,7 @@ function App() {
       })
       setSelectedConversationID(conversation.id)
       setMessages([])
+      setMessagesConversationID('')
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1296,6 +1306,7 @@ function App() {
       )
       setSelectedConversationID('')
       setMessages([])
+      setMessagesConversationID('')
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1516,6 +1527,7 @@ function App() {
       )
       setSelectedConversationID('')
       setMessages([])
+      setMessagesConversationID('')
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1892,7 +1904,8 @@ function App() {
                 ref={messageListRef}
                 onScroll={handleMessageListScroll}
               >
-                {isLoadingMessages ? (
+                {isLoadingMessages ||
+                messagesConversationID !== selectedConversationID ? (
                   <div className="empty-chat">
                     <p className="eyebrow">Loading</p>
                     <h2>Messages are coming in.</h2>
