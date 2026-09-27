@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"slices"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/auth"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/presence"
@@ -18,11 +19,12 @@ type WebSocketConversationService interface {
 }
 
 type WebSocketHandler struct {
-	conversations WebSocketConversationService
-	hub           *realtime.Hub
-	presence      *presence.Service
-	jwtSecret     string
-	upgrader      websocket.Upgrader
+	conversations  WebSocketConversationService
+	hub            *realtime.Hub
+	presence       *presence.Service
+	jwtSecret      string
+	allowedOrigins []string
+	upgrader       websocket.Upgrader
 }
 
 type typingEventResponse struct {
@@ -30,17 +32,30 @@ type typingEventResponse struct {
 	UserID         uuid.UUID `json:"user_id"`
 }
 
-func NewWebSocketHandler(conversations WebSocketConversationService, hub *realtime.Hub, presence *presence.Service, jwtSecret string) *WebSocketHandler {
-	return &WebSocketHandler{
-		conversations: conversations,
-		hub:           hub,
-		presence:      presence,
-		jwtSecret:     jwtSecret,
+func NewWebSocketHandler(conversations WebSocketConversationService, hub *realtime.Hub, presence *presence.Service, jwtSecret string, allowedOrigins []string) *WebSocketHandler {
+	handler := &WebSocketHandler{
+		conversations:  conversations,
+		hub:            hub,
+		presence:       presence,
+		jwtSecret:      jwtSecret,
+		allowedOrigins: allowedOrigins,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
 	}
+	handler.upgrader.CheckOrigin = handler.checkOrigin
+
+	return handler
+}
+
+func (h *WebSocketHandler) checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	return slices.Contains(h.allowedOrigins, origin)
 }
 
 func (h *WebSocketHandler) Conversation(c *gin.Context) {

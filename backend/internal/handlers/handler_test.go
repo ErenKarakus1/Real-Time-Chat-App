@@ -377,7 +377,7 @@ func TestMessageHandlerInternalError(t *testing.T) {
 
 func TestWebSocketHandlerPublishesTypingEvents(t *testing.T) {
 	pubsub := &fakePubSub{}
-	handler := NewWebSocketHandler(nil, realtime.NewHub(pubsub), nil, "secret")
+	handler := NewWebSocketHandler(nil, realtime.NewHub(pubsub), nil, "secret", nil)
 	conversationID := uuid.New()
 	userID := uuid.New()
 
@@ -400,5 +400,20 @@ func TestWebSocketHandlerPublishesTypingEvents(t *testing.T) {
 	handler.handleIncomingEvent(context.Background(), conversationID, userID, realtime.Event{Type: "message.created"})
 	if len(pubsub.events) != 1 {
 		t.Fatalf("published %d events after ignored event, want 1", len(pubsub.events))
+	}
+}
+
+func TestWebSocketHandlerChecksAllowedOrigins(t *testing.T) {
+	handler := NewWebSocketHandler(nil, nil, nil, "secret", []string{"http://127.0.0.1:5173"})
+
+	request := httptest.NewRequest(http.MethodGet, "/ws/conversations/"+uuid.New().String(), nil)
+	request.Header.Set("Origin", "http://127.0.0.1:5173")
+	if !handler.checkOrigin(request) {
+		t.Fatalf("expected configured origin to be allowed")
+	}
+
+	request.Header.Set("Origin", "http://evil.example")
+	if handler.checkOrigin(request) {
+		t.Fatalf("expected unconfigured origin to be rejected")
 	}
 }

@@ -41,7 +41,7 @@ func NewRouter(cfg config.Config, dbPool *pgxpool.Pool, redisClient *redis.Clien
 	realtimePubSub := realtime.NewRedisPubSub(redisClient)
 	realtimeHub := realtime.NewHub(realtimePubSub)
 	messageHandler := handlers.NewMessageHandler(messageService, realtimeHub)
-	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, presenceService, cfg.JWTSecret)
+	webSocketHandler := handlers.NewWebSocketHandler(conversationRepository, realtimeHub, presenceService, cfg.JWTSecret, cfg.CORSAllowedOrigins())
 
 	registerRoutes(router, cfg.JWTSecret, redisClient, authHandler, conversationHandler, messageHandler, webSocketHandler)
 

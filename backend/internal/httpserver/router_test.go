@@ -21,7 +21,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handlers.NewAuthHandler(nil, nil),
 		handlers.NewConversationHandler(nil),
 		handlers.NewMessageHandler(nil, nil),
-		handlers.NewWebSocketHandler(nil, nil, nil, "test-secret"),
+		handlers.NewWebSocketHandler(nil, nil, nil, "test-secret", nil),
 	)
 
 	routes := make(map[string]bool)
