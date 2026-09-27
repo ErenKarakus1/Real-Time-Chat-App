@@ -1,5 +1,12 @@
 # Real Time Chat App
 
+![Go](https://img.shields.io/badge/Go-1.26.5-00ADD8?style=for-the-badge&logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-8-FF4438?style=for-the-badge&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
 A full-stack real-time chat application built with **Go Gin**, **React**, **PostgreSQL**, **Redis**, and **WebSockets**. It supports direct messages, rooms, role-based room management, typing indicators, read receipts, presence, message history pagination, and Docker-based local development.
 
 ## Tech Stack
