@@ -855,6 +855,18 @@ function App() {
     return participant.username || participant.email || participant.user_id
   }
 
+  function mergeParticipantIdentity(
+    currentParticipant: Participant,
+    updatedParticipant: Participant,
+  ) {
+    return {
+      ...currentParticipant,
+      ...updatedParticipant,
+      username: updatedParticipant.username || currentParticipant.username,
+      email: updatedParticipant.email || currentParticipant.email,
+    }
+  }
+
   function canRemoveParticipant(participant: Participant) {
     if (!currentParticipant || participant.user_id === user?.id) {
       return false
@@ -1296,7 +1308,7 @@ function App() {
       setParticipants((currentParticipants) =>
         currentParticipants.map((currentParticipant) =>
           currentParticipant.user_id === updatedParticipant.user_id
-            ? updatedParticipant
+            ? mergeParticipantIdentity(currentParticipant, updatedParticipant)
             : currentParticipant,
         ),
       )
@@ -1305,7 +1317,7 @@ function App() {
         [selectedConversationID]: (currentParticipants[selectedConversationID] ?? []).map(
           (currentParticipant) =>
             currentParticipant.user_id === updatedParticipant.user_id
-              ? updatedParticipant
+              ? mergeParticipantIdentity(currentParticipant, updatedParticipant)
               : currentParticipant,
         ),
       }))
@@ -1339,7 +1351,7 @@ function App() {
           }
 
           return currentParticipant.user_id === newOwner.user_id
-            ? newOwner
+            ? mergeParticipantIdentity(currentParticipant, newOwner)
             : currentParticipant
         }),
       )
@@ -1352,7 +1364,7 @@ function App() {
             }
 
             return currentParticipant.user_id === newOwner.user_id
-              ? newOwner
+              ? mergeParticipantIdentity(currentParticipant, newOwner)
               : currentParticipant
           },
         ),

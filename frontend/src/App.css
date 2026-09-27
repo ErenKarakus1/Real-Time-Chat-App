@@ -143,12 +143,12 @@ button:hover:not(:disabled) {
 }
 
 .primary-button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.7;
 }
 
 .new-chat-button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.75;
 }
 
@@ -517,7 +517,7 @@ button:hover:not(:disabled) {
 .room-action-button:disabled,
 .participant-form button:disabled,
 .participant-actions button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.6;
 }
 
@@ -671,7 +671,7 @@ button:hover:not(:disabled) {
 }
 
 .message-actions button:disabled {
-  cursor: wait;
+  cursor: default;
   opacity: 0.6;
 }
 
