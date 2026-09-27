@@ -39,6 +39,7 @@ import {
 } from './api'
 
 const TOKEN_KEY = 'rtc_token'
+const MESSAGE_PAGE_SIZE = 30
 
 type AuthMode = 'login' | 'register'
 
@@ -91,6 +92,8 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [draftMessage, setDraftMessage] = useState('')
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false)
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [messageError, setMessageError] = useState('')
   const [socketError, setSocketError] = useState('')
@@ -121,6 +124,11 @@ function App() {
   const tokenRef = useRef(token)
   const userIDRef = useRef(user?.id ?? '')
   const messageListRef = useRef<HTMLDivElement | null>(null)
+  const shouldScrollToBottomRef = useRef(true)
+  const restoreMessageScrollRef = useRef<{
+    scrollHeight: number
+    scrollTop: number
+  } | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -235,13 +243,18 @@ function App() {
         if (isCurrent) {
           setIsLoadingMessages(true)
           setMessageError('')
+          setHasOlderMessages(false)
+          shouldScrollToBottomRef.current = true
         }
 
-        return listMessages(token, selectedConversationID)
+        return listMessages(token, selectedConversationID, {
+          limit: MESSAGE_PAGE_SIZE,
+        })
       })
       .then((items) => {
         if (isCurrent) {
           setMessages(items)
+          setHasOlderMessages(items.length === MESSAGE_PAGE_SIZE)
         }
       })
       .catch((caughtError) => {
@@ -265,10 +278,25 @@ function App() {
   }, [token, selectedConversationID])
 
   useEffect(() => {
-    messageListRef.current?.scrollTo({
-      top: messageListRef.current.scrollHeight,
-      behavior: 'smooth',
-    })
+    const messageList = messageListRef.current
+    if (!messageList) {
+      return
+    }
+
+    const restoreScroll = restoreMessageScrollRef.current
+    if (restoreScroll) {
+      messageList.scrollTop =
+        messageList.scrollHeight - restoreScroll.scrollHeight + restoreScroll.scrollTop
+      restoreMessageScrollRef.current = null
+      return
+    }
+
+    if (shouldScrollToBottomRef.current) {
+      messageList.scrollTo({
+        top: messageList.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
   }, [messages, selectedConversationID])
 
   useEffect(() => {
@@ -731,6 +759,8 @@ function App() {
     setConversationError('')
     setConversationSearch('')
     setMessages([])
+    setHasOlderMessages(false)
+    setIsLoadingOlderMessages(false)
     setDraftMessage('')
     setMessageError('')
     setSocketError('')
@@ -786,6 +816,10 @@ function App() {
 
   function selectConversation(conversation: Conversation) {
     setMessages([])
+    setHasOlderMessages(false)
+    setIsLoadingOlderMessages(false)
+    shouldScrollToBottomRef.current = true
+    restoreMessageScrollRef.current = null
     const existingSocket = conversationSocketsRef.current.get(conversation.id)
     setSocketStatus(
       existingSocket?.readyState === WebSocket.OPEN ? 'connected' : 'idle',
@@ -905,6 +939,7 @@ function App() {
   }
 
   function addMessage(message: Message) {
+    shouldScrollToBottomRef.current = true
     setMessages((currentMessages) => {
       if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
         return currentMessages
@@ -912,6 +947,64 @@ function App() {
 
       return [...currentMessages, message]
     })
+  }
+
+  async function loadOlderMessages() {
+    if (
+      !token ||
+      !selectedConversationID ||
+      !hasOlderMessages ||
+      isLoadingOlderMessages ||
+      messages.length === 0
+    ) {
+      return
+    }
+
+    const messageList = messageListRef.current
+    if (messageList) {
+      restoreMessageScrollRef.current = {
+        scrollHeight: messageList.scrollHeight,
+        scrollTop: messageList.scrollTop,
+      }
+    }
+    shouldScrollToBottomRef.current = false
+    setIsLoadingOlderMessages(true)
+    setMessageError('')
+
+    try {
+      const olderMessages = await listMessages(token, selectedConversationID, {
+        before: messages[0].created_at,
+        limit: MESSAGE_PAGE_SIZE,
+      })
+      setHasOlderMessages(olderMessages.length === MESSAGE_PAGE_SIZE)
+      setMessages((currentMessages) => {
+        const currentMessageIDs = new Set(
+          currentMessages.map((message) => message.id),
+        )
+        return [
+          ...olderMessages.filter((message) => !currentMessageIDs.has(message.id)),
+          ...currentMessages,
+        ]
+      })
+    } catch (caughtError) {
+      restoreMessageScrollRef.current = null
+      setMessageError(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Could not load older messages.',
+      )
+    } finally {
+      setIsLoadingOlderMessages(false)
+    }
+  }
+
+  function handleMessageListScroll() {
+    const messageList = messageListRef.current
+    if (!messageList || messageList.scrollTop > 24) {
+      return
+    }
+
+    void loadOlderMessages()
   }
 
   async function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
@@ -939,6 +1032,10 @@ function App() {
       })
       setSelectedConversationID(conversation.id)
       setMessages([])
+      setHasOlderMessages(false)
+      setIsLoadingOlderMessages(false)
+      shouldScrollToBottomRef.current = true
+      restoreMessageScrollRef.current = null
       setSocketStatus('idle')
       setSocketError('')
       setEditingMessageID('')
@@ -1180,6 +1277,8 @@ function App() {
       )
       setSelectedConversationID('')
       setMessages([])
+      setHasOlderMessages(false)
+      setIsLoadingOlderMessages(false)
       setRoomNameDraft('')
       setParticipantsByConversation((currentParticipants) => {
         const nextParticipants = { ...currentParticipants }
@@ -1397,6 +1496,8 @@ function App() {
       )
       setSelectedConversationID('')
       setMessages([])
+      setHasOlderMessages(false)
+      setIsLoadingOlderMessages(false)
       setParticipants([])
       setRoomNameDraft('')
       setParticipantsByConversation((currentParticipants) => {
@@ -1764,7 +1865,12 @@ function App() {
                 )}
               </div>
 
-              <div className="message-list" aria-live="polite" ref={messageListRef}>
+              <div
+                className="message-list"
+                aria-live="polite"
+                ref={messageListRef}
+                onScroll={handleMessageListScroll}
+              >
                 {isLoadingMessages ? (
                   <div className="empty-chat">
                     <p className="eyebrow">Loading</p>
@@ -1776,7 +1882,13 @@ function App() {
                     <h2>Start the conversation.</h2>
                   </div>
                 ) : (
-                  messages.map((message) => {
+                  <>
+                    {isLoadingOlderMessages && (
+                      <div className="older-messages-status">
+                        Loading older messages
+                      </div>
+                    )}
+                    {messages.map((message) => {
                     const isOwnMessage = message.sender_id === user.id
                     const isEditingMessage = editingMessageID === message.id
                     const isPendingMessage = pendingMessageID === message.id
@@ -1844,7 +1956,8 @@ function App() {
                         )}
                       </article>
                     )
-                  })
+                    })}
+                  </>
                 )}
               </div>
 

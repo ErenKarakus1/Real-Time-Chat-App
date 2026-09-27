@@ -593,6 +593,17 @@ button:hover:not(:disabled) {
   scroll-behavior: smooth;
 }
 
+.older-messages-status {
+  align-self: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .message-bubble {
   width: fit-content;
   max-width: min(620px, 78%);

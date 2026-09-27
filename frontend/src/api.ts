@@ -123,6 +123,11 @@ type UpdateMessageInput = {
   content: string
 }
 
+type ListMessagesOptions = {
+  before?: string
+  limit?: number
+}
+
 type ApiErrorBody = {
   error?: string
 }
@@ -326,8 +331,18 @@ export async function markConversationRead(
 export async function listMessages(
   token: string,
   conversationID: string,
+  options: ListMessagesOptions = {},
 ): Promise<Message[]> {
-  return request<Message[]>(`/conversations/${conversationID}/messages`, {
+  const params = new URLSearchParams()
+  if (options.before) {
+    params.set('before', options.before)
+  }
+  if (options.limit) {
+    params.set('limit', String(options.limit))
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  return request<Message[]>(`/conversations/${conversationID}/messages${suffix}`, {
     headers: authHeaders(token),
   })
 }
