@@ -83,6 +83,7 @@ function App() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [messageError, setMessageError] = useState('')
+  const [socketError, setSocketError] = useState('')
   const [socketStatus, setSocketStatus] = useState<'idle' | 'connected' | 'offline'>(
     'idle',
   )
@@ -101,6 +102,7 @@ function App() {
   const [directSearch, setDirectSearch] = useState('')
   const [directSearchResults, setDirectSearchResults] = useState<User[]>([])
   const socketRef = useRef<WebSocket | null>(null)
+  const messageListRef = useRef<HTMLDivElement | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -223,6 +225,13 @@ function App() {
   }, [token, selectedConversationID])
 
   useEffect(() => {
+    messageListRef.current?.scrollTo({
+      top: messageListRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [messages, selectedConversationID])
+
+  useEffect(() => {
     if (!token || directSearch.trim().length < 2) {
       return
     }
@@ -338,6 +347,7 @@ function App() {
 
     socket.addEventListener('open', () => {
       if (isCurrent) {
+        setSocketError('')
         setSocketStatus('connected')
       }
     })
@@ -400,6 +410,7 @@ function App() {
 
     socket.addEventListener('error', () => {
       if (isCurrent) {
+        setSocketError('Realtime connection failed. Messages still work after refresh.')
         setSocketStatus('offline')
       }
     })
@@ -484,6 +495,7 @@ function App() {
     setMessages([])
     setDraftMessage('')
     setMessageError('')
+    setSocketError('')
     setSocketStatus('idle')
     setEditingMessageID('')
     setEditingContent('')
@@ -511,6 +523,7 @@ function App() {
   function selectConversation(conversation: Conversation) {
     setMessages([])
     setSocketStatus('idle')
+    setSocketError('')
     setEditingMessageID('')
     setEditingContent('')
     setTypingUserIDs([])
@@ -599,6 +612,7 @@ function App() {
       setSelectedConversationID(conversation.id)
       setMessages([])
       setSocketStatus('idle')
+      setSocketError('')
       setEditingMessageID('')
       setEditingContent('')
       setTypingUserIDs([])
@@ -1202,7 +1216,7 @@ function App() {
                 )}
               </div>
 
-              <div className="message-list" aria-live="polite">
+              <div className="message-list" aria-live="polite" ref={messageListRef}>
                 {isLoadingMessages ? (
                   <div className="empty-chat">
                     <p className="eyebrow">Loading</p>
@@ -1283,6 +1297,7 @@ function App() {
               </div>
 
               {messageError && <p className="form-message error">{messageError}</p>}
+              {socketError && <p className="form-message warning">{socketError}</p>}
               {typingUserIDs.length > 0 && (
                 <p className="typing-indicator">
                   {typingUserIDs.length === 1

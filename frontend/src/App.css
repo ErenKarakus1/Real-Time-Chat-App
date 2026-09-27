@@ -157,6 +157,11 @@ input:focus {
   background: #dcfce7;
 }
 
+.form-message.warning {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .loading-bar {
   height: 6px;
   overflow: hidden;
