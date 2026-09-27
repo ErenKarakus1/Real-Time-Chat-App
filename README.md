@@ -257,3 +257,28 @@ docker compose config --quiet
 - Admins can add members and remove members.
 - Members can leave rooms.
 - Owners must transfer ownership before leaving a room.
+
+## Known Limitations
+
+- Email verification is not implemented.
+- Password reset is not implemented.
+- File/image attachments are not supported.
+- Message reactions are not supported.
+- Message search is not implemented.
+- Presence is based on active WebSocket connections.
+- The frontend currently keeps one WebSocket connection per visible conversation.
+- Room membership changes are not broadcast as realtime room events yet.
+- The app is optimized for local development, not production deployment hardening.
+
+## Future Improvements
+
+- Add email verification and password reset.
+- Add file and image message attachments.
+- Add message reactions and reply threads.
+- Add full-text message search.
+- Add realtime room membership events.
+- Add push notifications or browser notifications.
+- Add profile settings and avatars.
+- Add refresh-token based auth.
+- Add end-to-end tests for critical chat flows.
+- Add production deployment configuration.
