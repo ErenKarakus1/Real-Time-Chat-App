@@ -94,6 +94,7 @@ function App() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
+  const [isAtMessageEnd, setIsAtMessageEnd] = useState(true)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [messageError, setMessageError] = useState('')
   const [socketError, setSocketError] = useState('')
@@ -244,6 +245,7 @@ function App() {
           setIsLoadingMessages(true)
           setMessageError('')
           setHasOlderMessages(false)
+          setIsAtMessageEnd(true)
           shouldScrollToBottomRef.current = true
         }
 
@@ -761,6 +763,7 @@ function App() {
     setMessages([])
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
+    setIsAtMessageEnd(true)
     setDraftMessage('')
     setMessageError('')
     setSocketError('')
@@ -818,6 +821,7 @@ function App() {
     setMessages([])
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
+    setIsAtMessageEnd(true)
     shouldScrollToBottomRef.current = true
     restoreMessageScrollRef.current = null
     const existingSocket = conversationSocketsRef.current.get(conversation.id)
@@ -1000,11 +1004,17 @@ function App() {
 
   function handleMessageListScroll() {
     const messageList = messageListRef.current
-    if (!messageList || messageList.scrollTop > 24) {
+    if (!messageList) {
       return
     }
 
-    void loadOlderMessages()
+    setIsAtMessageEnd(
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
+    )
+
+    if (messageList.scrollTop <= 24) {
+      void loadOlderMessages()
+    }
   }
 
   function scrollToMessageEnd() {
@@ -1012,6 +1022,7 @@ function App() {
       top: messageListRef.current.scrollHeight,
       behavior: 'smooth',
     })
+    setIsAtMessageEnd(true)
   }
 
   async function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
@@ -1041,6 +1052,7 @@ function App() {
       setMessages([])
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
+      setIsAtMessageEnd(true)
       shouldScrollToBottomRef.current = true
       restoreMessageScrollRef.current = null
       setSocketStatus('idle')
@@ -1286,6 +1298,7 @@ function App() {
       setMessages([])
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
+      setIsAtMessageEnd(true)
       setRoomNameDraft('')
       setParticipantsByConversation((currentParticipants) => {
         const nextParticipants = { ...currentParticipants }
@@ -1505,6 +1518,7 @@ function App() {
       setMessages([])
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
+      setIsAtMessageEnd(true)
       setParticipants([])
       setRoomNameDraft('')
       setParticipantsByConversation((currentParticipants) => {
@@ -1973,7 +1987,7 @@ function App() {
               {typingUserIDs.length > 0 && (
                 <p className="typing-indicator">{typingLabel()}</p>
               )}
-              {messages.length > 0 && (
+              {messages.length > 0 && !isAtMessageEnd && (
                 <button
                   className="scroll-end-button"
                   type="button"
