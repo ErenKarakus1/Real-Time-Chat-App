@@ -50,6 +50,11 @@ export type Participant = {
   last_read_at: string | null
 }
 
+export type Presence = {
+  user_id: string
+  online: boolean
+}
+
 export type RealtimeEvent =
   | {
       type: 'message.created'
@@ -159,6 +164,22 @@ export async function searchUsers(token: string, query: string): Promise<User[]>
   params.set('q', query.trim())
 
   return request<User[]>(`/users/search?${params.toString()}`, {
+    headers: authHeaders(token),
+  })
+}
+
+export async function getPresence(
+  token: string,
+  userIDs: string[],
+): Promise<Presence[]> {
+  if (userIDs.length === 0) {
+    return []
+  }
+
+  const params = new URLSearchParams()
+  params.set('ids', userIDs.join(','))
+
+  return request<Presence[]>(`/users/presence?${params.toString()}`, {
     headers: authHeaders(token),
   })
 }

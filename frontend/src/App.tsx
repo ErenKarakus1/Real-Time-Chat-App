@@ -16,6 +16,7 @@ import {
   conversationWebSocketURL,
   deleteMessage,
   deleteRoom,
+  getPresence,
   leaveRoom,
   listConversations,
   listMessages,
@@ -103,6 +104,10 @@ function App() {
   const [roomNameDraft, setRoomNameDraft] = useState('')
   const [isUpdatingRoom, setIsUpdatingRoom] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [participantsByConversation, setParticipantsByConversation] = useState<
+    Record<string, Participant[]>
+  >({})
+  const [presenceByUserID, setPresenceByUserID] = useState<Record<string, boolean>>({})
   const [participantUserID, setParticipantUserID] = useState('')
   const [participantSearch, setParticipantSearch] = useState('')
   const [participantSearchResults, setParticipantSearchResults] = useState<User[]>([])
@@ -112,8 +117,23 @@ function App() {
   const [directSearchResults, setDirectSearchResults] = useState<User[]>([])
   const socketRef = useRef<WebSocket | null>(null)
   const conversationSocketsRef = useRef<Map<string, WebSocket>>(new Map())
+  const selectedConversationIDRef = useRef(selectedConversationID)
+  const tokenRef = useRef(token)
+  const userIDRef = useRef(user?.id ?? '')
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    selectedConversationIDRef.current = selectedConversationID
+  }, [selectedConversationID])
+
+  useEffect(() => {
+    tokenRef.current = token
+  }, [token])
+
+  useEffect(() => {
+    userIDRef.current = user?.id ?? ''
+  }, [user?.id])
 
   useEffect(() => {
     const conversationSockets = conversationSocketsRef.current
@@ -306,6 +326,83 @@ function App() {
     }
   }, [token, participantSearch, participants, user?.id])
 
+  useEffect(() => {
+    if (!token || !user || conversations.length === 0) {
+      return
+    }
+
+    let isCurrent = true
+    const missingConversations = conversations.filter(
+      (conversation) => !participantsByConversation[conversation.id],
+    )
+
+    if (missingConversations.length === 0) {
+      return
+    }
+
+    Promise.all(
+      missingConversations.map((conversation) =>
+        listParticipants(token, conversation.id)
+          .then((items) => [conversation.id, items] as const)
+          .catch(() => [conversation.id, [] as Participant[]] as const),
+      ),
+    ).then((results) => {
+      if (!isCurrent) {
+        return
+      }
+
+      setParticipantsByConversation((currentParticipants) => {
+        const nextParticipants = { ...currentParticipants }
+        results.forEach(([conversationID, items]) => {
+          nextParticipants[conversationID] = items
+        })
+        return nextParticipants
+      })
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, user, conversations, participantsByConversation])
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
+    const userIDs = new Set<string>()
+    Object.values(participantsByConversation).forEach((conversationParticipants) => {
+      conversationParticipants.forEach((participant) => userIDs.add(participant.user_id))
+    })
+    directSearchResults.forEach((result) => userIDs.add(result.id))
+    participantSearchResults.forEach((result) => userIDs.add(result.id))
+
+    if (userIDs.size === 0) {
+      return
+    }
+
+    let isCurrent = true
+    getPresence(token, [...userIDs])
+      .then((statuses) => {
+        if (!isCurrent) {
+          return
+        }
+
+        setPresenceByUserID((currentPresence) => {
+          const nextPresence = { ...currentPresence }
+          statuses.forEach((status) => {
+            nextPresence[status.user_id] = status.online
+          })
+          return nextPresence
+        })
+      })
+      .catch(() => undefined)
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, participantsByConversation, directSearchResults, participantSearchResults])
+
   const selectedConversation = useMemo(
     () =>
       conversations.find(
@@ -342,6 +439,10 @@ function App() {
       .then((items) => {
         if (isCurrent) {
           setParticipants(items)
+          setParticipantsByConversation((currentParticipants) => ({
+            ...currentParticipants,
+            [selectedConversation.id]: items,
+          }))
         }
       })
       .catch((caughtError) => {
@@ -366,8 +467,12 @@ function App() {
 
   const handleRealtimeEvent = useCallback(
     (conversationID: string, realtimeEvent: RealtimeEvent) => {
+      const currentSelectedConversationID = selectedConversationIDRef.current
+      const currentUserID = userIDRef.current
+      const currentToken = tokenRef.current
+
       if (realtimeEvent.type === 'message.created') {
-        if (conversationID === selectedConversationID) {
+        if (conversationID === currentSelectedConversationID) {
           setMessages((currentMessages) => {
             if (
               currentMessages.some(
@@ -380,8 +485,8 @@ function App() {
             return [...currentMessages, realtimeEvent.data]
           })
 
-          if (realtimeEvent.data.sender_id !== user?.id && token) {
-            markConversationRead(token, conversationID).catch(() => undefined)
+          if (realtimeEvent.data.sender_id !== currentUserID && currentToken) {
+            markConversationRead(currentToken, conversationID).catch(() => undefined)
           }
         }
 
@@ -392,8 +497,8 @@ function App() {
             }
 
             const shouldIncrementUnread =
-              conversationID !== selectedConversationID &&
-              realtimeEvent.data.sender_id !== user?.id
+              conversationID !== currentSelectedConversationID &&
+              realtimeEvent.data.sender_id !== currentUserID
 
             return {
               ...currentConversation,
@@ -407,7 +512,7 @@ function App() {
       }
 
       if (realtimeEvent.type === 'message.updated') {
-        if (conversationID === selectedConversationID) {
+        if (conversationID === currentSelectedConversationID) {
           setMessages((currentMessages) =>
             currentMessages.map((message) =>
               message.id === realtimeEvent.data.id ? realtimeEvent.data : message,
@@ -418,7 +523,7 @@ function App() {
       }
 
       if (realtimeEvent.type === 'message.deleted') {
-        if (conversationID === selectedConversationID) {
+        if (conversationID === currentSelectedConversationID) {
           setMessages((currentMessages) =>
             currentMessages.filter((message) => message.id !== realtimeEvent.data.id),
           )
@@ -427,7 +532,7 @@ function App() {
       }
 
       if (realtimeEvent.type === 'conversation.read') {
-        if (realtimeEvent.data.user_id === user?.id) {
+        if (realtimeEvent.data.user_id === currentUserID) {
           setConversations((currentConversations) =>
             currentConversations.map((currentConversation) =>
               currentConversation.id === realtimeEvent.data.conversation_id
@@ -437,7 +542,23 @@ function App() {
           )
         }
 
-        if (conversationID === selectedConversationID) {
+        setParticipantsByConversation((currentParticipants) => {
+          const conversationParticipants = currentParticipants[conversationID]
+          if (!conversationParticipants) {
+            return currentParticipants
+          }
+
+          return {
+            ...currentParticipants,
+            [conversationID]: conversationParticipants.map((participant) =>
+              participant.user_id === realtimeEvent.data.user_id
+                ? { ...participant, last_read_at: realtimeEvent.data.last_read_at }
+                : participant,
+            ),
+          }
+        })
+
+        if (conversationID === currentSelectedConversationID) {
           setParticipants((currentParticipants) =>
             currentParticipants.map((participant) =>
               participant.user_id === realtimeEvent.data.user_id
@@ -449,12 +570,12 @@ function App() {
         return
       }
 
-      if (conversationID !== selectedConversationID) {
+      if (conversationID !== currentSelectedConversationID) {
         return
       }
 
       if (realtimeEvent.type === 'typing.started') {
-        if (realtimeEvent.data.user_id !== user?.id) {
+        if (realtimeEvent.data.user_id !== currentUserID) {
           setTypingUserIDs((currentUserIDs) =>
             currentUserIDs.includes(realtimeEvent.data.user_id)
               ? currentUserIDs
@@ -470,7 +591,7 @@ function App() {
         )
       }
     },
-    [selectedConversationID, token, user?.id],
+    [],
   )
 
   useEffect(() => {
@@ -499,7 +620,7 @@ function App() {
       conversationSocketsRef.current.set(conversation.id, socket)
 
       socket.addEventListener('open', () => {
-        if (conversation.id === selectedConversationID) {
+        if (conversation.id === selectedConversationIDRef.current) {
           setSocketError('')
           setSocketStatus('connected')
         }
@@ -522,13 +643,13 @@ function App() {
 
       socket.addEventListener('close', () => {
         conversationSocketsRef.current.delete(conversation.id)
-        if (conversation.id === selectedConversationID) {
+        if (conversation.id === selectedConversationIDRef.current) {
           setSocketStatus('offline')
         }
       })
 
       socket.addEventListener('error', () => {
-        if (conversation.id === selectedConversationID) {
+        if (conversation.id === selectedConversationIDRef.current) {
           setSocketError('Realtime connection failed. Messages still work after refresh.')
           setSocketStatus('offline')
         }
@@ -620,6 +741,8 @@ function App() {
     setTypingUserIDs([])
     setRoomNameDraft('')
     setParticipants([])
+    setParticipantsByConversation({})
+    setPresenceByUserID({})
     setParticipantUserID('')
     setParticipantSearch('')
     setParticipantSearchResults([])
@@ -634,7 +757,31 @@ function App() {
       return conversation.name
     }
 
-    return conversation.type === 'direct' ? 'Direct message' : 'Room'
+    if (conversation.type === 'direct') {
+      const otherParticipant = participantsByConversation[conversation.id]?.find(
+        (participant) => participant.user_id !== user?.id,
+      )
+      return otherParticipant
+        ? participantLabel(otherParticipant)
+        : 'Direct message'
+    }
+
+    return 'Room'
+  }
+
+  function conversationPresenceLabel(conversation: Conversation) {
+    if (conversation.type !== 'direct') {
+      return ''
+    }
+
+    const otherParticipant = participantsByConversation[conversation.id]?.find(
+      (participant) => participant.user_id !== user?.id,
+    )
+    if (!otherParticipant) {
+      return ''
+    }
+
+    return presenceByUserID[otherParticipant.user_id] ? 'Online' : 'Offline'
   }
 
   function selectConversation(conversation: Conversation) {
@@ -694,6 +841,10 @@ function App() {
 
   function userOptionLabel(option: User) {
     return `${option.username} (${option.email})`
+  }
+
+  function presenceLabel(userID: string) {
+    return presenceByUserID[userID] ? 'Online' : 'Offline'
   }
 
   function participantLabel(participant: Participant) {
@@ -1018,6 +1169,11 @@ function App() {
       setSelectedConversationID('')
       setMessages([])
       setRoomNameDraft('')
+      setParticipantsByConversation((currentParticipants) => {
+        const nextParticipants = { ...currentParticipants }
+        delete nextParticipants[selectedConversationID]
+        return nextParticipants
+      })
       setSocketStatus('idle')
     } catch (caughtError) {
       setConversationError(
@@ -1059,6 +1215,22 @@ function App() {
 
         return [...currentParticipants, participant]
       })
+      setParticipantsByConversation((currentParticipants) => {
+        const conversationParticipants =
+          currentParticipants[selectedConversationID] ?? []
+        if (
+          conversationParticipants.some(
+            (currentParticipant) => currentParticipant.user_id === participant.user_id,
+          )
+        ) {
+          return currentParticipants
+        }
+
+        return {
+          ...currentParticipants,
+          [selectedConversationID]: [...conversationParticipants, participant],
+        }
+      })
       setParticipantUserID('')
       setParticipantSearch('')
       setParticipantSearchResults([])
@@ -1086,6 +1258,12 @@ function App() {
       setParticipants((currentParticipants) =>
         currentParticipants.filter((participant) => participant.user_id !== userID),
       )
+      setParticipantsByConversation((currentParticipants) => ({
+        ...currentParticipants,
+        [selectedConversationID]: (
+          currentParticipants[selectedConversationID] ?? []
+        ).filter((participant) => participant.user_id !== userID),
+      }))
     } catch (caughtError) {
       setConversationError(
         caughtError instanceof ApiError
@@ -1122,6 +1300,15 @@ function App() {
             : currentParticipant,
         ),
       )
+      setParticipantsByConversation((currentParticipants) => ({
+        ...currentParticipants,
+        [selectedConversationID]: (currentParticipants[selectedConversationID] ?? []).map(
+          (currentParticipant) =>
+            currentParticipant.user_id === updatedParticipant.user_id
+              ? updatedParticipant
+              : currentParticipant,
+        ),
+      }))
     } catch (caughtError) {
       setConversationError(
         caughtError instanceof ApiError
@@ -1156,6 +1343,20 @@ function App() {
             : currentParticipant
         }),
       )
+      setParticipantsByConversation((currentParticipants) => ({
+        ...currentParticipants,
+        [selectedConversationID]: (currentParticipants[selectedConversationID] ?? []).map(
+          (currentParticipant) => {
+            if (currentParticipant.user_id === user?.id) {
+              return { ...currentParticipant, role: 'admin' }
+            }
+
+            return currentParticipant.user_id === newOwner.user_id
+              ? newOwner
+              : currentParticipant
+          },
+        ),
+      }))
     } catch (caughtError) {
       setConversationError(
         caughtError instanceof ApiError
@@ -1186,6 +1387,11 @@ function App() {
       setMessages([])
       setParticipants([])
       setRoomNameDraft('')
+      setParticipantsByConversation((currentParticipants) => {
+        const nextParticipants = { ...currentParticipants }
+        delete nextParticipants[selectedConversationID]
+        return nextParticipants
+      })
       setSocketStatus('idle')
     } catch (caughtError) {
       setConversationError(
@@ -1277,7 +1483,8 @@ function App() {
                         type="button"
                         onClick={() => selectDirectUser(result)}
                       >
-                        {userOptionLabel(result)}
+                        <span>{userOptionLabel(result)}</span>
+                        <small>{presenceLabel(result.id)}</small>
                       </button>
                     ))}
                   </div>
@@ -1331,7 +1538,11 @@ function App() {
                     {conversationLabel(conversation)}
                   </span>
                   <span className="conversation-meta">
-                    <small>{conversation.type === 'direct' ? 'DM' : 'Room'}</small>
+                    <small>
+                      {conversation.type === 'direct'
+                        ? `DM${conversationPresenceLabel(conversation) ? ` - ${conversationPresenceLabel(conversation)}` : ''}`
+                        : 'Room'}
+                    </small>
                     {Boolean(conversation.unread_count) && (
                       <strong aria-label={`${conversation.unread_count} unread messages`}>
                         {conversation.unread_count}
@@ -1365,6 +1576,12 @@ function App() {
                   </span>
                 </div>
                 <h2>{conversationLabel(selectedConversation)}</h2>
+                {selectedConversation.type === 'direct' &&
+                  conversationPresenceLabel(selectedConversation) && (
+                    <p className="chat-subtitle">
+                      {conversationPresenceLabel(selectedConversation)}
+                    </p>
+                  )}
                 {selectedConversation.type === 'room' && (
                   <div className="room-panel">
                     <div className="room-tools-stack">
@@ -1445,7 +1662,8 @@ function App() {
                             type="button"
                             onClick={() => selectParticipantUser(result)}
                           >
-                            {userOptionLabel(result)}
+                            <span>{userOptionLabel(result)}</span>
+                            <small>{presenceLabel(result.id)}</small>
                           </button>
                         ))}
                       </div>
@@ -1461,6 +1679,9 @@ function App() {
                           <div className="participant-row" key={participant.user_id}>
                             <span>
                               {participantLabel(participant)}
+                              {participant.user_id !== user.id && (
+                                <small>{presenceLabel(participant.user_id)}</small>
+                              )}
                             </span>
                             <strong>{participant.role}</strong>
                             {(canChangeParticipantRole(participant) ||
