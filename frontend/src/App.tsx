@@ -295,7 +295,7 @@ function App() {
   )
 
   useEffect(() => {
-    if (!token || !selectedConversation || selectedConversation.type !== 'room') {
+    if (!token || !selectedConversation) {
       return
     }
 
@@ -732,6 +732,22 @@ function App() {
     }).format(new Date(value))
   }
 
+  function messageDeliveryLabel(message: Message) {
+    if (message.sender_id !== user?.id) {
+      return ''
+    }
+
+    const readByOtherParticipant = participants.some((participant) => {
+      if (participant.user_id === user.id || !participant.last_read_at) {
+        return false
+      }
+
+      return new Date(participant.last_read_at).getTime() >= new Date(message.created_at).getTime()
+    })
+
+    return readByOtherParticipant ? 'Read' : 'Sent'
+  }
+
   function startEditingMessage(message: Message) {
     setEditingMessageID(message.id)
     setEditingContent(message.content)
@@ -1096,15 +1112,22 @@ function App() {
                 <button
                   className="conversation-item"
                   data-active={conversation.id === selectedConversationID}
+                  data-unread={Boolean(conversation.unread_count)}
                   key={conversation.id}
                   onClick={() => selectConversation(conversation)}
                   type="button"
                 >
-                  <span>{conversationLabel(conversation)}</span>
-                  <small>
-                    {conversation.type === 'direct' ? 'DM' : 'Room'}
-                    {conversation.unread_count ? ` - ${conversation.unread_count}` : ''}
-                  </small>
+                  <span className="conversation-name">
+                    {conversationLabel(conversation)}
+                  </span>
+                  <span className="conversation-meta">
+                    <small>{conversation.type === 'direct' ? 'DM' : 'Room'}</small>
+                    {Boolean(conversation.unread_count) && (
+                      <strong aria-label={`${conversation.unread_count} unread messages`}>
+                        {conversation.unread_count}
+                      </strong>
+                    )}
+                  </span>
                 </button>
               ))
             )}
@@ -1255,6 +1278,7 @@ function App() {
                     const isOwnMessage = message.sender_id === user.id
                     const isEditingMessage = editingMessageID === message.id
                     const isPendingMessage = pendingMessageID === message.id
+                    const deliveryLabel = messageDeliveryLabel(message)
 
                     return (
                       <article
@@ -1291,6 +1315,9 @@ function App() {
                               </time>
                               {message.updated_at !== message.created_at && (
                                 <span>Edited</span>
+                              )}
+                              {deliveryLabel && (
+                                <span className="delivery-status">{deliveryLabel}</span>
                               )}
                             </div>
                             {isOwnMessage && (

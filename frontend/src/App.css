@@ -327,19 +327,49 @@ button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
-.conversation-item span {
+.conversation-item[data-unread='true'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: #eef7f4;
+}
+
+.conversation-item[data-unread='true'] .conversation-name {
+  color: var(--accent);
+}
+
+.conversation-name {
   overflow: hidden;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-item small {
+.conversation-meta {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.conversation-meta small {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.conversation-meta strong {
+  min-width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 7px;
+  color: white;
+  background: var(--accent);
+  font-size: 0.76rem;
+  line-height: 1;
 }
 
 .empty-list {
@@ -562,6 +592,10 @@ button:hover:not(:disabled) {
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.message-meta .delivery-status {
+  font-weight: 800;
 }
 
 .message-actions {
