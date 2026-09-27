@@ -1007,6 +1007,13 @@ function App() {
     void loadOlderMessages()
   }
 
+  function scrollToMessageEnd() {
+    messageListRef.current?.scrollTo({
+      top: messageListRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
+  }
+
   async function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!token) {
@@ -1965,6 +1972,15 @@ function App() {
               {socketError && <p className="form-message warning">{socketError}</p>}
               {typingUserIDs.length > 0 && (
                 <p className="typing-indicator">{typingLabel()}</p>
+              )}
+              {messages.length > 0 && (
+                <button
+                  className="scroll-end-button"
+                  type="button"
+                  onClick={scrollToMessageEnd}
+                >
+                  End
+                </button>
               )}
 
               <form className="composer" onSubmit={handleSendMessage}>
