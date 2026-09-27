@@ -107,6 +107,7 @@ function App() {
   const [pendingMessageID, setPendingMessageID] = useState('')
   const [typingUserIDs, setTypingUserIDs] = useState<string[]>([])
   const [roomNameDraft, setRoomNameDraft] = useState('')
+  const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false)
   const [isUpdatingRoom, setIsUpdatingRoom] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [participantsByConversation, setParticipantsByConversation] = useState<
@@ -777,6 +778,7 @@ function App() {
     setPendingMessageID('')
     setTypingUserIDs([])
     setRoomNameDraft('')
+    setIsRoomSettingsOpen(false)
     setParticipants([])
     setParticipantsByConversation({})
     setPresenceByUserID({})
@@ -842,6 +844,7 @@ function App() {
     setEditingContent('')
     setTypingUserIDs([])
     setRoomNameDraft(conversation.name ?? '')
+    setIsRoomSettingsOpen(false)
     setParticipants([])
     setParticipantUserID('')
     setParticipantSearch('')
@@ -1071,6 +1074,7 @@ function App() {
       setEditingContent('')
       setTypingUserIDs([])
       setRoomNameDraft(conversation.name ?? '')
+      setIsRoomSettingsOpen(false)
       setParticipants([])
       setParticipantUserID('')
       setParticipantSearch('')
@@ -1717,9 +1721,25 @@ function App() {
               <div className="chat-title">
                 <div className="chat-title-row">
                   <p className="eyebrow">{selectedConversation.type}</p>
-                  <span className="socket-status" data-status={socketStatus}>
-                    {socketStatus === 'connected' ? 'Live' : 'Offline'}
-                  </span>
+                  <div className="chat-title-actions">
+                    {selectedConversation.type === 'room' && (
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label="Room settings"
+                        title="Room settings"
+                        aria-expanded={isRoomSettingsOpen}
+                        onClick={() =>
+                          setIsRoomSettingsOpen((currentValue) => !currentValue)
+                        }
+                      >
+                        ⚙
+                      </button>
+                    )}
+                    <span className="socket-status" data-status={socketStatus}>
+                      {socketStatus === 'connected' ? 'Live' : 'Offline'}
+                    </span>
+                  </div>
                 </div>
                 <h2>{conversationLabel(selectedConversation)}</h2>
                 {selectedConversation.type === 'direct' &&
@@ -1728,7 +1748,7 @@ function App() {
                       {conversationPresenceLabel(selectedConversation)}
                     </p>
                   )}
-                {selectedConversation.type === 'room' && (
+                {selectedConversation.type === 'room' && isRoomSettingsOpen && (
                   <div className="room-panel">
                     <div className="room-tools-stack">
                       {canManageRoom && (

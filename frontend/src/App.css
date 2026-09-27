@@ -448,6 +448,35 @@ button:hover:not(:disabled) {
   gap: 12px;
 }
 
+.chat-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button[aria-expanded='true'] {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--canvas);
+}
+
 .socket-status {
   display: inline-grid;
   min-width: 64px;
