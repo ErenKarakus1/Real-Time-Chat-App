@@ -140,6 +140,15 @@ export async function me(token: string): Promise<User> {
   })
 }
 
+export async function searchUsers(token: string, query: string): Promise<User[]> {
+  const params = new URLSearchParams()
+  params.set('q', query.trim())
+
+  return request<User[]>(`/users/search?${params.toString()}`, {
+    headers: authHeaders(token),
+  })
+}
+
 export async function listConversations(
   token: string,
   query = '',

@@ -177,15 +177,17 @@ input:focus {
 .app-shell {
   min-height: 100svh;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr);
   background: var(--surface);
 }
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 20px;
-  padding: 24px;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  gap: 12px;
+  max-height: 100svh;
+  overflow: hidden;
+  padding: 18px;
   border-right: 1px solid var(--line);
   background: var(--canvas);
 }
@@ -200,9 +202,12 @@ input:focus {
 
 .new-chat-form {
   display: grid;
-  gap: 12px;
-  padding-bottom: 20px;
+  gap: 10px;
+  padding: 12px;
   border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
 }
 
 .brand-mark {
@@ -224,8 +229,31 @@ input:focus {
 }
 
 .conversation-search {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
+}
+
+.user-results {
+  display: grid;
+  gap: 6px;
+}
+
+.user-results button {
+  width: 100%;
+  min-height: 34px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .conversation-item {

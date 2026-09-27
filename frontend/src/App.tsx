@@ -18,6 +18,7 @@ import {
   me,
   register,
   removeParticipant,
+  searchUsers,
   updateMessage,
   updateRoom,
   type Conversation,
@@ -93,8 +94,12 @@ function App() {
   const [isUpdatingRoom, setIsUpdatingRoom] = useState(false)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [participantUserID, setParticipantUserID] = useState('')
+  const [participantSearch, setParticipantSearch] = useState('')
+  const [participantSearchResults, setParticipantSearchResults] = useState<User[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
   const [pendingParticipantID, setPendingParticipantID] = useState('')
+  const [directSearch, setDirectSearch] = useState('')
+  const [directSearchResults, setDirectSearchResults] = useState<User[]>([])
   const socketRef = useRef<WebSocket | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
 
@@ -216,6 +221,61 @@ function App() {
       isCurrent = false
     }
   }, [token, selectedConversationID])
+
+  useEffect(() => {
+    if (!token || directSearch.trim().length < 2) {
+      return
+    }
+
+    let isCurrent = true
+
+    searchUsers(token, directSearch)
+      .then((results) => {
+        if (isCurrent) {
+          setDirectSearchResults(results.filter((result) => result.id !== user?.id))
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setDirectSearchResults([])
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, directSearch, user?.id])
+
+  useEffect(() => {
+    if (!token || participantSearch.trim().length < 2) {
+      return
+    }
+
+    let isCurrent = true
+
+    searchUsers(token, participantSearch)
+      .then((results) => {
+        if (isCurrent) {
+          const currentParticipantIDs = new Set(
+            participants.map((participant) => participant.user_id),
+          )
+          setParticipantSearchResults(
+            results.filter(
+              (result) => result.id !== user?.id && !currentParticipantIDs.has(result.id),
+            ),
+          )
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setParticipantSearchResults([])
+        }
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [token, participantSearch, participants, user?.id])
 
   const selectedConversation = useMemo(
     () =>
@@ -432,7 +492,11 @@ function App() {
     setRoomNameDraft('')
     setParticipants([])
     setParticipantUserID('')
+    setParticipantSearch('')
+    setParticipantSearchResults([])
     setPendingParticipantID('')
+    setDirectSearch('')
+    setDirectSearchResults([])
     stopTyping()
   }
 
@@ -453,6 +517,8 @@ function App() {
     setRoomNameDraft(conversation.name ?? '')
     setParticipants([])
     setParticipantUserID('')
+    setParticipantSearch('')
+    setParticipantSearchResults([])
     setPendingParticipantID('')
     stopTyping()
     setSelectedConversationID(conversation.id)
@@ -479,6 +545,22 @@ function App() {
       ...currentForm,
       [field]: value,
     }))
+  }
+
+  function selectDirectUser(selectedUser: User) {
+    updateNewConversationForm('otherUserID', selectedUser.id)
+    setDirectSearch(selectedUser.username)
+    setDirectSearchResults([])
+  }
+
+  function selectParticipantUser(selectedUser: User) {
+    setParticipantUserID(selectedUser.id)
+    setParticipantSearch(selectedUser.username)
+    setParticipantSearchResults([])
+  }
+
+  function userOptionLabel(option: User) {
+    return `${option.username} (${option.email})`
   }
 
   function addMessage(message: Message) {
@@ -523,6 +605,10 @@ function App() {
       setRoomNameDraft(conversation.name ?? '')
       setParticipants([])
       setParticipantUserID('')
+      setParticipantSearch('')
+      setParticipantSearchResults([])
+      setDirectSearch('')
+      setDirectSearchResults([])
       setNewConversationForm(emptyNewConversationForm)
     } catch (caughtError) {
       setConversationError(
@@ -779,6 +865,8 @@ function App() {
         return [...currentParticipants, participant]
       })
       setParticipantUserID('')
+      setParticipantSearch('')
+      setParticipantSearchResults([])
     } catch (caughtError) {
       setConversationError(
         caughtError instanceof ApiError
@@ -901,22 +989,44 @@ function App() {
               </label>
             ) : (
               <label>
-                User ID
+                User
                 <input
-                  onChange={(event) =>
-                    updateNewConversationForm('otherUserID', event.target.value)
-                  }
-                  placeholder="UUID"
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setDirectSearch(value)
+                    if (value.trim().length < 2) {
+                      setDirectSearchResults([])
+                    }
+                    updateNewConversationForm('otherUserID', '')
+                  }}
+                  placeholder="Search username or email"
                   required
-                  type="text"
-                  value={newConversationForm.otherUserID}
+                  type="search"
+                  value={directSearch}
                 />
+                {directSearchResults.length > 0 && (
+                  <div className="user-results">
+                    {directSearchResults.map((result) => (
+                      <button
+                        key={result.id}
+                        type="button"
+                        onClick={() => selectDirectUser(result)}
+                      >
+                        {userOptionLabel(result)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </label>
             )}
 
             <button
               className="new-chat-button"
-              disabled={isCreatingConversation}
+              disabled={
+                isCreatingConversation ||
+                (newConversationForm.mode === 'direct' &&
+                  !newConversationForm.otherUserID)
+              }
               type="submit"
             >
               {isCreatingConversation ? 'Creating' : 'New chat'}
@@ -1021,22 +1131,43 @@ function App() {
 
                     <form className="participant-form" onSubmit={handleAddParticipant}>
                       <input
-                        aria-label="Participant user ID"
-                        onChange={(event) => setParticipantUserID(event.target.value)}
-                        placeholder="User UUID"
-                        type="text"
-                        value={participantUserID}
+                        aria-label="Participant"
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setParticipantSearch(value)
+                          if (value.trim().length < 2) {
+                            setParticipantSearchResults([])
+                          }
+                          setParticipantUserID('')
+                        }}
+                        placeholder="Search username or email"
+                        type="search"
+                        value={participantSearch}
                       />
                       <button
                         disabled={
-                          !participantUserID.trim() ||
-                          pendingParticipantID === participantUserID.trim()
+                          !participantUserID ||
+                          pendingParticipantID === participantUserID
                         }
                         type="submit"
                       >
                         Add
                       </button>
                     </form>
+
+                    {participantSearchResults.length > 0 && (
+                      <div className="user-results">
+                        {participantSearchResults.map((result) => (
+                          <button
+                            key={result.id}
+                            type="button"
+                            onClick={() => selectParticipantUser(result)}
+                          >
+                            {userOptionLabel(result)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="participant-list">
                       {isLoadingParticipants ? (
