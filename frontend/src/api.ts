@@ -70,6 +70,10 @@ export type RealtimeEvent =
         user_id: string
       }
     }
+  | {
+      type: 'conversation.read'
+      data: Participant
+    }
 
 type RegisterInput = {
   username: string

@@ -19,7 +19,7 @@ func TestRegisterRoutes(t *testing.T) {
 		"test-secret",
 		nil,
 		handlers.NewAuthHandler(nil, nil),
-		handlers.NewConversationHandler(nil),
+		handlers.NewConversationHandler(nil, nil),
 		handlers.NewMessageHandler(nil, nil),
 		handlers.NewWebSocketHandler(nil, nil, nil, "test-secret", nil),
 	)

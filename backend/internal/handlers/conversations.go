@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/middleware"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/models"
+	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/realtime"
 	"github.com/ErenKarakus1/Real-Time-Chat-App/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -31,6 +33,7 @@ type ConversationService interface {
 
 type ConversationHandler struct {
 	conversations ConversationService
+	hub           *realtime.Hub
 }
 
 type createRoomRequest struct {
@@ -57,9 +60,10 @@ type transferOwnershipRequest struct {
 	UserID string `json:"user_id"`
 }
 
-func NewConversationHandler(conversations ConversationService) *ConversationHandler {
+func NewConversationHandler(conversations ConversationService, hub *realtime.Hub) *ConversationHandler {
 	return &ConversationHandler{
 		conversations: conversations,
+		hub:           hub,
 	}
 }
 
@@ -173,7 +177,17 @@ func (h *ConversationHandler) MarkRead(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.NewParticipantResponse(participant))
+	response := models.NewParticipantResponse(participant)
+	if h.hub != nil {
+		if err := h.hub.Publish(c, conversationID, realtime.Event{
+			Type: realtime.EventConversationRead,
+			Data: response,
+		}); err != nil {
+			log.Printf("broadcast conversation read: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *ConversationHandler) UpdateRoomName(c *gin.Context) {

@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
 import './App.css'
 import {
   addParticipant,
@@ -102,8 +109,19 @@ function App() {
   const [directSearch, setDirectSearch] = useState('')
   const [directSearchResults, setDirectSearchResults] = useState<User[]>([])
   const socketRef = useRef<WebSocket | null>(null)
+  const conversationSocketsRef = useRef<Map<string, WebSocket>>(new Map())
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const conversationSockets = conversationSocketsRef.current
+
+    return () => {
+      conversationSockets.forEach((socket) => socket.close())
+      conversationSockets.clear()
+      socketRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     if (!token) {
@@ -334,53 +352,92 @@ function App() {
     }
   }, [token, selectedConversation])
 
-  useEffect(() => {
-    if (!token || !selectedConversationID) {
-      return
-    }
-
-    const socket = new WebSocket(
-      conversationWebSocketURL(token, selectedConversationID),
-    )
-    socketRef.current = socket
-    let isCurrent = true
-
-    socket.addEventListener('open', () => {
-      if (isCurrent) {
-        setSocketError('')
-        setSocketStatus('connected')
-      }
-    })
-
-    socket.addEventListener('message', (event) => {
-      if (!isCurrent || typeof event.data !== 'string') {
-        return
-      }
-
-      let realtimeEvent: RealtimeEvent
-      try {
-        realtimeEvent = JSON.parse(event.data) as RealtimeEvent
-      } catch {
-        return
-      }
+  const handleRealtimeEvent = useCallback(
+    (conversationID: string, realtimeEvent: RealtimeEvent) => {
       if (realtimeEvent.type === 'message.created') {
-        addMessage(realtimeEvent.data)
+        if (conversationID === selectedConversationID) {
+          setMessages((currentMessages) => {
+            if (
+              currentMessages.some(
+                (currentMessage) => currentMessage.id === realtimeEvent.data.id,
+              )
+            ) {
+              return currentMessages
+            }
+
+            return [...currentMessages, realtimeEvent.data]
+          })
+
+          if (realtimeEvent.data.sender_id !== user?.id && token) {
+            markConversationRead(token, conversationID).catch(() => undefined)
+          }
+        }
+
+        setConversations((currentConversations) =>
+          currentConversations.map((currentConversation) => {
+            if (currentConversation.id !== conversationID) {
+              return currentConversation
+            }
+
+            const shouldIncrementUnread =
+              conversationID !== selectedConversationID &&
+              realtimeEvent.data.sender_id !== user?.id
+
+            return {
+              ...currentConversation,
+              unread_count: shouldIncrementUnread
+                ? (currentConversation.unread_count ?? 0) + 1
+                : currentConversation.unread_count,
+            }
+          }),
+        )
         return
       }
 
       if (realtimeEvent.type === 'message.updated') {
-        setMessages((currentMessages) =>
-          currentMessages.map((message) =>
-            message.id === realtimeEvent.data.id ? realtimeEvent.data : message,
-          ),
-        )
+        if (conversationID === selectedConversationID) {
+          setMessages((currentMessages) =>
+            currentMessages.map((message) =>
+              message.id === realtimeEvent.data.id ? realtimeEvent.data : message,
+            ),
+          )
+        }
         return
       }
 
       if (realtimeEvent.type === 'message.deleted') {
-        setMessages((currentMessages) =>
-          currentMessages.filter((message) => message.id !== realtimeEvent.data.id),
-        )
+        if (conversationID === selectedConversationID) {
+          setMessages((currentMessages) =>
+            currentMessages.filter((message) => message.id !== realtimeEvent.data.id),
+          )
+        }
+        return
+      }
+
+      if (realtimeEvent.type === 'conversation.read') {
+        if (realtimeEvent.data.user_id === user?.id) {
+          setConversations((currentConversations) =>
+            currentConversations.map((currentConversation) =>
+              currentConversation.id === realtimeEvent.data.conversation_id
+                ? { ...currentConversation, unread_count: 0 }
+                : currentConversation,
+            ),
+          )
+        }
+
+        if (conversationID === selectedConversationID) {
+          setParticipants((currentParticipants) =>
+            currentParticipants.map((participant) =>
+              participant.user_id === realtimeEvent.data.user_id
+                ? { ...participant, last_read_at: realtimeEvent.data.last_read_at }
+                : participant,
+            ),
+          )
+        }
+        return
+      }
+
+      if (conversationID !== selectedConversationID) {
         return
       }
 
@@ -400,27 +457,75 @@ function App() {
           currentUserIDs.filter((userID) => userID !== realtimeEvent.data.user_id),
         )
       }
-    })
+    },
+    [selectedConversationID, token, user?.id],
+  )
 
-    socket.addEventListener('close', () => {
-      if (isCurrent) {
-        setSocketStatus('offline')
-      }
-    })
-
-    socket.addEventListener('error', () => {
-      if (isCurrent) {
-        setSocketError('Realtime connection failed. Messages still work after refresh.')
-        setSocketStatus('offline')
-      }
-    })
-
-    return () => {
-      isCurrent = false
+  useEffect(() => {
+    if (!token || !user) {
+      conversationSocketsRef.current.forEach((socket) => socket.close())
+      conversationSocketsRef.current.clear()
       socketRef.current = null
-      socket.close()
+      return
     }
-  }, [token, selectedConversationID, user?.id])
+
+    const conversationIDs = new Set(conversations.map((conversation) => conversation.id))
+
+    conversationSocketsRef.current.forEach((socket, conversationID) => {
+      if (!conversationIDs.has(conversationID)) {
+        socket.close()
+        conversationSocketsRef.current.delete(conversationID)
+      }
+    })
+
+    conversations.forEach((conversation) => {
+      if (conversationSocketsRef.current.has(conversation.id)) {
+        return
+      }
+
+      const socket = new WebSocket(conversationWebSocketURL(token, conversation.id))
+      conversationSocketsRef.current.set(conversation.id, socket)
+
+      socket.addEventListener('open', () => {
+        if (conversation.id === selectedConversationID) {
+          setSocketError('')
+          setSocketStatus('connected')
+        }
+      })
+
+      socket.addEventListener('message', (event) => {
+        if (typeof event.data !== 'string') {
+          return
+        }
+
+        let realtimeEvent: RealtimeEvent
+        try {
+          realtimeEvent = JSON.parse(event.data) as RealtimeEvent
+        } catch {
+          return
+        }
+
+        handleRealtimeEvent(conversation.id, realtimeEvent)
+      })
+
+      socket.addEventListener('close', () => {
+        conversationSocketsRef.current.delete(conversation.id)
+        if (conversation.id === selectedConversationID) {
+          setSocketStatus('offline')
+        }
+      })
+
+      socket.addEventListener('error', () => {
+        if (conversation.id === selectedConversationID) {
+          setSocketError('Realtime connection failed. Messages still work after refresh.')
+          setSocketStatus('offline')
+        }
+      })
+    })
+
+    socketRef.current = conversationSocketsRef.current.get(selectedConversationID) ?? null
+
+  }, [token, user, conversations, selectedConversationID, handleRealtimeEvent])
 
   const title = useMemo(() => {
     if (isBootstrapping) {
@@ -522,7 +627,10 @@ function App() {
 
   function selectConversation(conversation: Conversation) {
     setMessages([])
-    setSocketStatus('idle')
+    const existingSocket = conversationSocketsRef.current.get(conversation.id)
+    setSocketStatus(
+      existingSocket?.readyState === WebSocket.OPEN ? 'connected' : 'idle',
+    )
     setSocketError('')
     setEditingMessageID('')
     setEditingContent('')

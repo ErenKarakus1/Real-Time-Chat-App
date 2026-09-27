@@ -189,7 +189,7 @@ func TestConversationHandlerListReturnsUnreadCount(t *testing.T) {
 			UnreadCount:  3,
 		}},
 	}
-	handler := NewConversationHandler(service)
+	handler := NewConversationHandler(service, nil)
 	router := testRouter(userID)
 	router.GET("/conversations", handler.List)
 
@@ -232,7 +232,8 @@ func TestConversationHandlerMarkReadStatusCodes(t *testing.T) {
 	userID := uuid.New()
 	conversationID := uuid.New()
 	service := &fakeHandlerConversationService{markReadErr: services.ErrConversationManagementDenied}
-	handler := NewConversationHandler(service)
+	pubsub := &fakePubSub{}
+	handler := NewConversationHandler(service, realtime.NewHub(pubsub))
 	router := testRouter(userID)
 	router.POST("/conversations/:conversation_id/read", handler.MarkRead)
 
@@ -254,10 +255,13 @@ func TestConversationHandlerMarkReadStatusCodes(t *testing.T) {
 	if !service.markReadCalled {
 		t.Fatalf("mark read was not called")
 	}
+	if len(pubsub.events) != 1 || pubsub.events[0].Type != realtime.EventConversationRead {
+		t.Fatalf("events = %+v, want conversation.read", pubsub.events)
+	}
 }
 
 func TestConversationHandlerCreateRoomValidation(t *testing.T) {
-	handler := NewConversationHandler(&fakeHandlerConversationService{createRoomErr: services.ErrInvalidRoomName})
+	handler := NewConversationHandler(&fakeHandlerConversationService{createRoomErr: services.ErrInvalidRoomName}, nil)
 	router := testRouter(uuid.New())
 	router.POST("/conversations/rooms", handler.CreateRoom)
 
@@ -270,7 +274,7 @@ func TestConversationHandlerCreateRoomValidation(t *testing.T) {
 func TestConversationHandlerNotFoundStatus(t *testing.T) {
 	conversationID := uuid.New()
 	service := &fakeHandlerConversationService{markReadErr: pgx.ErrNoRows, updateRoomErr: pgx.ErrNoRows}
-	handler := NewConversationHandler(service)
+	handler := NewConversationHandler(service, nil)
 	router := testRouter(uuid.New())
 	router.POST("/conversations/:conversation_id/read", handler.MarkRead)
 	router.PATCH("/conversations/:conversation_id", handler.UpdateRoomName)
@@ -350,7 +354,7 @@ func TestMessageHandlerStatusCodes(t *testing.T) {
 }
 
 func TestHandlersRequireAuthenticatedUser(t *testing.T) {
-	conversationHandler := NewConversationHandler(&fakeHandlerConversationService{})
+	conversationHandler := NewConversationHandler(&fakeHandlerConversationService{}, nil)
 	messageHandler := NewMessageHandler(&fakeHandlerMessageService{}, realtime.NewHub(&fakePubSub{}))
 	router := testRouter(uuid.Nil)
 	router.GET("/conversations", conversationHandler.List)
