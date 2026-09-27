@@ -251,10 +251,11 @@ func (r *ConversationRepository) FindParticipant(ctx context.Context, conversati
 
 func (r *ConversationRepository) ListParticipants(ctx context.Context, conversationID uuid.UUID) ([]models.ConversationParticipant, error) {
 	query := `
-		SELECT conversation_id, user_id, role, joined_at, last_read_at
-		FROM conversation_participants
-		WHERE conversation_id = $1
-		ORDER BY joined_at ASC
+		SELECT cp.conversation_id, cp.user_id, u.username, u.email, cp.role, cp.joined_at, cp.last_read_at
+		FROM conversation_participants cp
+		INNER JOIN users u ON u.id = cp.user_id
+		WHERE cp.conversation_id = $1
+		ORDER BY cp.joined_at ASC
 	`
 
 	rows, err := r.db.Query(ctx, query, conversationID)
@@ -265,7 +266,7 @@ func (r *ConversationRepository) ListParticipants(ctx context.Context, conversat
 
 	participants := make([]models.ConversationParticipant, 0)
 	for rows.Next() {
-		participant, err := scanConversationParticipant(rows)
+		participant, err := scanConversationParticipantWithUser(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -400,6 +401,22 @@ func scanConversationParticipant(row pgx.Row) (models.ConversationParticipant, e
 	err := row.Scan(
 		&participant.ConversationID,
 		&participant.UserID,
+		&participant.Role,
+		&participant.JoinedAt,
+		&participant.LastReadAt,
+	)
+
+	return participant, err
+}
+
+func scanConversationParticipantWithUser(row pgx.Row) (models.ConversationParticipant, error) {
+	var participant models.ConversationParticipant
+
+	err := row.Scan(
+		&participant.ConversationID,
+		&participant.UserID,
+		&participant.Username,
+		&participant.Email,
 		&participant.Role,
 		&participant.JoinedAt,
 		&participant.LastReadAt,

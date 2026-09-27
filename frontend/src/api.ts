@@ -43,6 +43,8 @@ export type DeletedMessage = {
 export type Participant = {
   conversation_id: string
   user_id: string
+  username?: string
+  email?: string
   role: 'owner' | 'admin' | 'member'
   joined_at: string
   last_read_at: string | null

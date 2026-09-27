@@ -576,6 +576,31 @@ function App() {
     return `${option.username} (${option.email})`
   }
 
+  function participantLabel(participant: Participant) {
+    if (participant.user_id === user?.id) {
+      return 'You'
+    }
+
+    return participant.username || participant.email || participant.user_id
+  }
+
+  function typingLabel() {
+    const names = typingUserIDs.map((userID) => {
+      const participant = participants.find((item) => item.user_id === userID)
+      return participant?.username || participant?.email || 'Someone'
+    })
+
+    if (names.length === 1) {
+      return `${names[0]} is typing`
+    }
+
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]} are typing`
+    }
+
+    return `${names[0]} and ${names.length - 1} others are typing`
+  }
+
   function addMessage(message: Message) {
     setMessages((currentMessages) => {
       if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
@@ -1192,9 +1217,7 @@ function App() {
                         participants.map((participant) => (
                           <div className="participant-row" key={participant.user_id}>
                             <span>
-                              {participant.user_id === user.id
-                                ? 'You'
-                                : participant.user_id}
+                              {participantLabel(participant)}
                             </span>
                             <strong>{participant.role}</strong>
                             {participant.user_id !== user.id && (
@@ -1299,11 +1322,7 @@ function App() {
               {messageError && <p className="form-message error">{messageError}</p>}
               {socketError && <p className="form-message warning">{socketError}</p>}
               {typingUserIDs.length > 0 && (
-                <p className="typing-indicator">
-                  {typingUserIDs.length === 1
-                    ? 'Someone is typing'
-                    : `${typingUserIDs.length} people are typing`}
-                </p>
+                <p className="typing-indicator">{typingLabel()}</p>
               )}
 
               <form className="composer" onSubmit={handleSendMessage}>

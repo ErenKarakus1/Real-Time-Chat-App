@@ -9,6 +9,8 @@ import (
 type ParticipantResponse struct {
 	ConversationID uuid.UUID       `json:"conversation_id"`
 	UserID         uuid.UUID       `json:"user_id"`
+	Username       string          `json:"username,omitempty"`
+	Email          string          `json:"email,omitempty"`
 	Role           ParticipantRole `json:"role"`
 	JoinedAt       time.Time       `json:"joined_at"`
 	LastReadAt     *time.Time      `json:"last_read_at"`
@@ -18,6 +20,8 @@ func NewParticipantResponse(participant ConversationParticipant) ParticipantResp
 	return ParticipantResponse{
 		ConversationID: participant.ConversationID,
 		UserID:         participant.UserID,
+		Username:       participant.Username,
+		Email:          participant.Email,
 		Role:           participant.Role,
 		JoinedAt:       participant.JoinedAt,
 		LastReadAt:     participant.LastReadAt,

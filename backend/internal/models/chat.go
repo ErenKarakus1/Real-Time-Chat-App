@@ -41,6 +41,8 @@ type Conversation struct {
 type ConversationParticipant struct {
 	ConversationID uuid.UUID       `json:"conversation_id"`
 	UserID         uuid.UUID       `json:"user_id"`
+	Username       string          `json:"username"`
+	Email          string          `json:"email"`
 	Role           ParticipantRole `json:"role"`
 	JoinedAt       time.Time       `json:"joined_at"`
 	LastReadAt     *time.Time      `json:"last_read_at"`
