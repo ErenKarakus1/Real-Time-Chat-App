@@ -6,6 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-8-FF4438?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 A full-stack real-time chat application built with **Go Gin**, **React**, **PostgreSQL**, **Redis**, and **WebSockets**. It supports direct messages, rooms, role-based room management, typing indicators, read receipts, presence, message history pagination, and Docker-based local development.
 
@@ -289,3 +290,7 @@ docker compose config --quiet
 - Add refresh-token based auth.
 - Add end-to-end tests for critical chat flows.
 - Add production deployment configuration.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
