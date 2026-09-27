@@ -716,17 +716,19 @@ button:hover:not(:disabled) {
 }
 
 .scroll-end-button {
-  width: fit-content;
-  justify-self: end;
-  min-height: 30px;
+  width: 32px;
+  height: 32px;
+  justify-self: center;
+  min-height: 32px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0;
   color: var(--muted);
   background: var(--surface);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
 }
 

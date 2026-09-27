@@ -1977,9 +1977,10 @@ function App() {
                 <button
                   className="scroll-end-button"
                   type="button"
+                  aria-label="Go to latest messages"
                   onClick={scrollToMessageEnd}
                 >
-                  End
+                  ↓
                 </button>
               )}
 
