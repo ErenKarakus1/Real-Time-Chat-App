@@ -111,6 +111,12 @@ Services:
 
 The `migrate` service runs database migrations before the backend starts.
 
+Health check:
+
+```text
+GET http://localhost:8080/health
+```
+
 ## Run Locally
 
 Start PostgreSQL and Redis first.
