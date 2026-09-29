@@ -132,6 +132,7 @@ function App() {
   const tokenRef = useRef(token)
   const userIDRef = useRef(user?.id ?? '')
   const messageListRef = useRef<HTMLDivElement | null>(null)
+  const unreadDividerRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottomRef = useRef(true)
   const restoreMessageScrollRef = useRef<{
     scrollHeight: number
@@ -150,6 +151,31 @@ function App() {
   useEffect(() => {
     userIDRef.current = user?.id ?? ''
   }, [user?.id])
+
+  const unreadDividerMessageID = useMemo(() => {
+    if (
+      !user ||
+      !unreadDivider ||
+      unreadDivider.conversationID !== selectedConversationID ||
+      messagesConversationID !== selectedConversationID
+    ) {
+      return ''
+    }
+
+    return (
+      messages.find((message) => {
+        if (message.sender_id === user.id) {
+          return false
+        }
+
+        return (
+          !unreadDivider.lastReadAt ||
+          new Date(message.created_at).getTime() >
+            new Date(unreadDivider.lastReadAt).getTime()
+        )
+      })?.id ?? ''
+    )
+  }, [messages, messagesConversationID, selectedConversationID, unreadDivider, user])
 
   useEffect(() => {
     const conversationSockets = conversationSocketsRef.current
@@ -302,12 +328,24 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
+      if (unreadDividerMessageID && unreadDividerRef.current) {
+        messageList.scrollTo({
+          top: unreadDividerRef.current.offsetTop - messageList.offsetTop - 10,
+        })
+        setIsAtMessageEnd(
+          messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
+        )
+        shouldScrollToBottomRef.current = false
+        return
+      }
+
       messageList.scrollTo({
         top: messageList.scrollHeight,
-        behavior: 'smooth',
       })
+      setIsAtMessageEnd(true)
+      shouldScrollToBottomRef.current = false
     }
-  }, [messages, selectedConversationID])
+  }, [messages, selectedConversationID, unreadDividerMessageID])
 
   useEffect(() => {
     if (!token || directSearch.trim().length < 2) {
@@ -453,31 +491,6 @@ function App() {
     () => participants.find((participant) => participant.user_id === user?.id) ?? null,
     [participants, user?.id],
   )
-
-  const unreadDividerMessageID = useMemo(() => {
-    if (
-      !user ||
-      !unreadDivider ||
-      unreadDivider.conversationID !== selectedConversationID ||
-      messagesConversationID !== selectedConversationID
-    ) {
-      return ''
-    }
-
-    return (
-      messages.find((message) => {
-        if (message.sender_id === user.id) {
-          return false
-        }
-
-        return (
-          !unreadDivider.lastReadAt ||
-          new Date(message.created_at).getTime() >
-            new Date(unreadDivider.lastReadAt).getTime()
-        )
-      })?.id ?? ''
-    )
-  }, [messages, messagesConversationID, selectedConversationID, unreadDivider, user])
 
   const canManageRoom = currentParticipant?.role === 'owner'
   const canManageMembers =
@@ -2028,7 +2041,7 @@ function App() {
                     return (
                       <Fragment key={message.id}>
                         {message.id === unreadDividerMessageID && (
-                          <div className="unread-divider">
+                          <div className="unread-divider" ref={unreadDividerRef}>
                             <span>New messages</span>
                           </div>
                         )}
