@@ -1283,7 +1283,7 @@ function App() {
     }).format(new Date(value))
   }
 
-  function messageDeliveryLabel(message: Message) {
+  function messageDeliveryStatus(message: Message): 'sent' | 'read' | '' {
     if (message.sender_id !== user?.id) {
       return ''
     }
@@ -1296,7 +1296,7 @@ function App() {
       return new Date(participant.last_read_at).getTime() >= new Date(message.created_at).getTime()
     })
 
-    return readByOtherParticipant ? 'Read' : 'Sent'
+    return readByOtherParticipant ? 'read' : 'sent'
   }
 
   function startEditingMessage(message: Message) {
@@ -2066,7 +2066,7 @@ function App() {
                     const isOwnMessage = message.sender_id === user.id
                     const isEditingMessage = editingMessageID === message.id
                     const isPendingMessage = pendingMessageID === message.id
-                    const deliveryLabel = messageDeliveryLabel(message)
+                    const deliveryStatus = messageDeliveryStatus(message)
 
                     return (
                       <Fragment key={message.id}>
@@ -2109,8 +2109,18 @@ function App() {
                                 {message.updated_at !== message.created_at && (
                                   <span>Edited</span>
                                 )}
-                                {deliveryLabel && (
-                                  <span className="delivery-status">{deliveryLabel}</span>
+                                {deliveryStatus && (
+                                  <span
+                                    className="delivery-status"
+                                    data-status={deliveryStatus}
+                                    aria-label={deliveryStatus === 'read' ? 'Read' : 'Sent'}
+                                    title={deliveryStatus === 'read' ? 'Read' : 'Sent'}
+                                  >
+                                    <span aria-hidden="true">✓</span>
+                                    {deliveryStatus === 'read' && (
+                                      <span aria-hidden="true">✓</span>
+                                    )}
+                                  </span>
                                 )}
                               </div>
                               {isOwnMessage && (

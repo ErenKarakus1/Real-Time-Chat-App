@@ -687,7 +687,7 @@ button:hover:not(:disabled) {
 }
 
 .message-bubble[data-own='true'] time,
-.message-bubble[data-own='true'] .message-meta span {
+.message-bubble[data-own='true'] .message-meta > span {
   color: rgb(255 255 255 / 0.78);
 }
 
@@ -705,7 +705,26 @@ button:hover:not(:disabled) {
 }
 
 .message-meta .delivery-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 16px;
+  color: rgb(255 255 255 / 0.78);
+  letter-spacing: -0.18em;
+  line-height: 1;
   font-weight: 800;
+}
+
+.message-meta .delivery-status[data-status='read'] {
+  color: #7dd3fc;
+}
+
+.message-meta .delivery-status span {
+  color: inherit;
+}
+
+.message-meta .delivery-status span + span {
+  margin-left: -3px;
 }
 
 .message-actions {
