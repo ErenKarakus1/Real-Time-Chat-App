@@ -727,20 +727,20 @@ button:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
+  min-width: 18px;
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 1000;
   letter-spacing: -0.18em;
   line-height: 0.9;
-  -webkit-text-stroke: 0.45px #ffffff;
+  -webkit-text-stroke: 0.8px #ffffff;
   text-shadow:
-    0 1px 1px rgb(0 0 0 / 0.55),
-    0 0 1px rgb(0 0 0 / 0.55);
+    0 1px 1px rgb(0 0 0 / 0.68),
+    0 0 2px rgb(0 0 0 / 0.64);
 }
 
 .message-meta .delivery-ticks span + span {
-  margin-left: -3px;
+  margin-left: -4px;
 }
 
 .message-meta .delivery-status[data-status='read'] .delivery-ticks {

@@ -346,18 +346,26 @@ function App() {
       let secondFrame = 0
       const firstFrame = requestAnimationFrame(() => {
         secondFrame = requestAnimationFrame(() => {
-          const target = shouldScrollToUnreadDivider
-            ? unreadDividerRef.current
-            : messageEndRef.current
+          if (!shouldScrollToUnreadDivider) {
+            messageList.scrollTop = messageList.scrollHeight
 
-          if (!target) {
-            return
+            if (forceScrollToBottomRef.current) {
+              requestAnimationFrame(() => {
+                messageList.scrollTop = messageList.scrollHeight
+              })
+            }
+          } else {
+            const target = unreadDividerRef.current
+
+            if (!target) {
+              return
+            }
+
+            target.scrollIntoView({
+              behavior: 'auto',
+              block: 'start',
+            })
           }
-
-          target.scrollIntoView({
-            behavior: 'auto',
-            block: shouldScrollToUnreadDivider ? 'start' : 'end',
-          })
 
           const isAtEnd =
             messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48
