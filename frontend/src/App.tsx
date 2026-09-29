@@ -137,6 +137,7 @@ function App() {
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottomRef = useRef(true)
   const forceScrollToBottomRef = useRef(false)
+  const isAtMessageEndRef = useRef(true)
   const restoreMessageScrollRef = useRef<{
     scrollHeight: number
     scrollTop: number
@@ -154,6 +155,10 @@ function App() {
   useEffect(() => {
     userIDRef.current = user?.id ?? ''
   }, [user?.id])
+
+  useEffect(() => {
+    isAtMessageEndRef.current = isAtMessageEnd
+  }, [isAtMessageEnd])
 
   const unreadDividerMessageID = useMemo(() => {
     if (
@@ -354,9 +359,10 @@ function App() {
             block: shouldScrollToUnreadDivider ? 'start' : 'end',
           })
 
-          setIsAtMessageEnd(
-            messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
-          )
+          const isAtEnd =
+            messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48
+          setIsAtMessageEnd(isAtEnd)
+          isAtMessageEndRef.current = isAtEnd
           forceScrollToBottomRef.current = false
           shouldScrollToBottomRef.current = false
         })
@@ -1075,10 +1081,13 @@ function App() {
   }
 
   function addMessage(message: Message, options: { forceBottom?: boolean } = {}) {
-    shouldScrollToBottomRef.current = true
     if (options.forceBottom) {
+      shouldScrollToBottomRef.current = true
       forceScrollToBottomRef.current = true
+    } else {
+      shouldScrollToBottomRef.current = isAtMessageEndRef.current
     }
+
     setMessages((currentMessages) => {
       if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
         return currentMessages
