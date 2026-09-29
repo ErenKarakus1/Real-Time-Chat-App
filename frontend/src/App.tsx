@@ -2,6 +2,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -133,6 +134,7 @@ function App() {
   const userIDRef = useRef(user?.id ?? '')
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const unreadDividerRef = useRef<HTMLDivElement | null>(null)
+  const messageEndRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottomRef = useRef(true)
   const restoreMessageScrollRef = useRef<{
     scrollHeight: number
@@ -313,9 +315,13 @@ function App() {
     }
   }, [token, selectedConversationID])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const messageList = messageListRef.current
-    if (!messageList || messagesConversationID !== selectedConversationID) {
+    if (
+      !messageList ||
+      messages.length === 0 ||
+      messagesConversationID !== selectedConversationID
+    ) {
       return
     }
 
@@ -328,21 +334,29 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
-      requestAnimationFrame(() => {
-        if (unreadDividerMessageID && unreadDividerRef.current) {
-          messageList.scrollTop =
-            unreadDividerRef.current.offsetTop - messageList.offsetTop - 10
+      let secondFrame = 0
+      const firstFrame = requestAnimationFrame(() => {
+        secondFrame = requestAnimationFrame(() => {
+          const target = unreadDividerMessageID
+            ? unreadDividerRef.current
+            : messageEndRef.current
+
+          target?.scrollIntoView({
+            behavior: 'auto',
+            block: unreadDividerMessageID ? 'start' : 'end',
+          })
+
           setIsAtMessageEnd(
             messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
           )
           shouldScrollToBottomRef.current = false
-          return
-        }
-
-        messageList.scrollTop = messageList.scrollHeight
-        setIsAtMessageEnd(true)
-        shouldScrollToBottomRef.current = false
+        })
       })
+
+      return () => {
+        cancelAnimationFrame(firstFrame)
+        cancelAnimationFrame(secondFrame)
+      }
     }
   }, [messages, messagesConversationID, selectedConversationID, unreadDividerMessageID])
 
@@ -2118,6 +2132,7 @@ function App() {
                       </Fragment>
                     )
                     })}
+                    <div ref={messageEndRef} />
                   </>
                 )}
               </div>
