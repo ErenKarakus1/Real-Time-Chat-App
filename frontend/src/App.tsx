@@ -334,14 +334,7 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
-      const selectedConversationUnreadCount =
-        conversations.find(
-          (conversation) => conversation.id === selectedConversationID,
-        )?.unread_count ?? 0
-      const shouldScrollToUnreadDivider = selectedConversationUnreadCount > 0
-      if (shouldScrollToUnreadDivider && !unreadDividerMessageID) {
-        return
-      }
+      const shouldScrollToUnreadDivider = Boolean(unreadDividerMessageID)
 
       let secondFrame = 0
       const firstFrame = requestAnimationFrame(() => {
@@ -374,7 +367,6 @@ function App() {
   }, [
     messages,
     messagesConversationID,
-    conversations,
     selectedConversationID,
     unreadDividerMessageID,
   ])
@@ -552,13 +544,12 @@ function App() {
               return currentDivider
             }
 
-            if (!selectedConversation.unread_count) {
-              return null
-            }
-
             const currentUserParticipant = items.find(
               (participant) => participant.user_id === user?.id,
             )
+            if (currentUserParticipant?.last_read_at) {
+              shouldScrollToBottomRef.current = true
+            }
             return {
               conversationID: selectedConversation.id,
               lastReadAt: currentUserParticipant?.last_read_at ?? null,
@@ -926,14 +917,10 @@ function App() {
     const cachedCurrentParticipant = participantsByConversation[conversation.id]?.find(
       (participant) => participant.user_id === user?.id,
     )
-    setUnreadDivider(
-      conversation.unread_count
-        ? {
-            conversationID: conversation.id,
-            lastReadAt: cachedCurrentParticipant?.last_read_at ?? null,
-          }
-        : null,
-    )
+    setUnreadDivider({
+      conversationID: conversation.id,
+      lastReadAt: cachedCurrentParticipant?.last_read_at ?? null,
+    })
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -975,14 +962,13 @@ function App() {
           const currentUserParticipant = items.find(
             (participant) => participant.user_id === user?.id,
           )
-          setUnreadDivider(
-            conversation.unread_count
-              ? {
-                  conversationID: conversation.id,
-                  lastReadAt: currentUserParticipant?.last_read_at ?? null,
-                }
-              : null,
-          )
+          if (currentUserParticipant?.last_read_at) {
+            shouldScrollToBottomRef.current = true
+          }
+          setUnreadDivider({
+            conversationID: conversation.id,
+            lastReadAt: currentUserParticipant?.last_read_at ?? null,
+          })
           setParticipantsByConversation((currentParticipants) => ({
             ...currentParticipants,
             [conversation.id]: items,
