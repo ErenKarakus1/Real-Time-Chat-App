@@ -1354,6 +1354,14 @@ function App() {
     }, 1600)
   }
 
+  function handleEditingContentChange(value: string) {
+    if (messageError.startsWith('Message must be ')) {
+      setMessageError('')
+    }
+
+    setEditingContent(value)
+  }
+
   function formatMessageTime(value: string) {
     const messageDate = new Date(value)
     const now = new Date()
@@ -2178,7 +2186,9 @@ function App() {
                               <input
                                 aria-label="Edit message"
                                 maxLength={MAX_MESSAGE_LENGTH}
-                                onChange={(event) => setEditingContent(event.target.value)}
+                                onChange={(event) =>
+                                  handleEditingContentChange(event.target.value)
+                                }
                                 type="text"
                                 value={editingContent}
                               />

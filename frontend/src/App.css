@@ -714,7 +714,7 @@ button:hover:not(:disabled) {
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.42);
 }
 
-.message-meta .delivery-status[data-status='read'] {
+.message-bubble[data-own='true'] .message-meta > .delivery-status {
   color: #ffffff;
 }
 
@@ -741,10 +741,6 @@ button:hover:not(:disabled) {
 
 .message-meta .delivery-ticks span + span {
   margin-left: -2px;
-}
-
-.message-meta .delivery-status[data-status='read'] .delivery-ticks {
-  color: inherit;
 }
 
 .message-actions {
