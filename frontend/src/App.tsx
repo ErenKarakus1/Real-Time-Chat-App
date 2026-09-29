@@ -315,7 +315,7 @@ function App() {
 
   useEffect(() => {
     const messageList = messageListRef.current
-    if (!messageList) {
+    if (!messageList || messagesConversationID !== selectedConversationID) {
       return
     }
 
@@ -328,24 +328,23 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
-      if (unreadDividerMessageID && unreadDividerRef.current) {
-        messageList.scrollTo({
-          top: unreadDividerRef.current.offsetTop - messageList.offsetTop - 10,
-        })
-        setIsAtMessageEnd(
-          messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
-        )
-        shouldScrollToBottomRef.current = false
-        return
-      }
+      requestAnimationFrame(() => {
+        if (unreadDividerMessageID && unreadDividerRef.current) {
+          messageList.scrollTop =
+            unreadDividerRef.current.offsetTop - messageList.offsetTop - 10
+          setIsAtMessageEnd(
+            messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
+          )
+          shouldScrollToBottomRef.current = false
+          return
+        }
 
-      messageList.scrollTo({
-        top: messageList.scrollHeight,
+        messageList.scrollTop = messageList.scrollHeight
+        setIsAtMessageEnd(true)
+        shouldScrollToBottomRef.current = false
       })
-      setIsAtMessageEnd(true)
-      shouldScrollToBottomRef.current = false
     }
-  }, [messages, selectedConversationID, unreadDividerMessageID])
+  }, [messages, messagesConversationID, selectedConversationID, unreadDividerMessageID])
 
   useEffect(() => {
     if (!token || directSearch.trim().length < 2) {
