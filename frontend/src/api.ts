@@ -342,9 +342,14 @@ export async function listMessages(
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : ''
-  return request<Message[]>(`/conversations/${conversationID}/messages${suffix}`, {
+  const messages = await request<Message[]>(`/conversations/${conversationID}/messages${suffix}`, {
     headers: authHeaders(token),
   })
+  return messages.sort(
+    (firstMessage, secondMessage) =>
+      new Date(firstMessage.created_at).getTime() -
+      new Date(secondMessage.created_at).getTime(),
+  )
 }
 
 export async function createMessage(
