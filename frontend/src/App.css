@@ -731,7 +731,7 @@ button:hover:not(:disabled) {
   color: #ffffff;
   font-size: 1.08rem;
   font-weight: 1000;
-  letter-spacing: -0.18em;
+  letter-spacing: -0.08em;
   line-height: 0.9;
   -webkit-text-stroke: 0.8px #ffffff;
   text-shadow:
@@ -740,7 +740,7 @@ button:hover:not(:disabled) {
 }
 
 .message-meta .delivery-ticks span + span {
-  margin-left: -4px;
+  margin-left: -2px;
 }
 
 .message-meta .delivery-status[data-status='read'] .delivery-ticks {

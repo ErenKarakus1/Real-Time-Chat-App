@@ -160,6 +160,14 @@ function App() {
     isAtMessageEndRef.current = isAtMessageEnd
   }, [isAtMessageEnd])
 
+  const scrollMessageListToBottom = useCallback((messageList: HTMLDivElement) => {
+    messageList.scrollTop = messageList.scrollHeight
+    const isAtEnd =
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48
+    setIsAtMessageEnd(isAtEnd)
+    isAtMessageEndRef.current = isAtEnd
+  }, [])
+
   const unreadDividerMessageID = useMemo(() => {
     if (
       !user ||
@@ -344,14 +352,19 @@ function App() {
         Boolean(unreadDividerMessageID) && !forceScrollToBottomRef.current
 
       let secondFrame = 0
+      let thirdFrame = 0
+      let finalTimeout = 0
       const firstFrame = requestAnimationFrame(() => {
         secondFrame = requestAnimationFrame(() => {
           if (!shouldScrollToUnreadDivider) {
-            messageList.scrollTop = messageList.scrollHeight
+            scrollMessageListToBottom(messageList)
 
             if (forceScrollToBottomRef.current) {
-              requestAnimationFrame(() => {
-                messageList.scrollTop = messageList.scrollHeight
+              thirdFrame = requestAnimationFrame(() => {
+                scrollMessageListToBottom(messageList)
+                finalTimeout = window.setTimeout(() => {
+                  scrollMessageListToBottom(messageList)
+                }, 80)
               })
             }
           } else {
@@ -367,10 +380,12 @@ function App() {
             })
           }
 
-          const isAtEnd =
-            messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48
-          setIsAtMessageEnd(isAtEnd)
-          isAtMessageEndRef.current = isAtEnd
+          if (shouldScrollToUnreadDivider) {
+            const isAtEnd =
+              messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48
+            setIsAtMessageEnd(isAtEnd)
+            isAtMessageEndRef.current = isAtEnd
+          }
           forceScrollToBottomRef.current = false
           shouldScrollToBottomRef.current = false
         })
@@ -379,11 +394,14 @@ function App() {
       return () => {
         cancelAnimationFrame(firstFrame)
         cancelAnimationFrame(secondFrame)
+        cancelAnimationFrame(thirdFrame)
+        window.clearTimeout(finalTimeout)
       }
     }
   }, [
     messages,
     messagesConversationID,
+    scrollMessageListToBottom,
     selectedConversationID,
     unreadDividerMessageID,
   ])
