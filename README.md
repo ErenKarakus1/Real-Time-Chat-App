@@ -54,6 +54,7 @@ A full-stack real-time chat application built with **Go Gin**, **React**, **Post
 - Real-time message create/update/delete events
 - Real-time read receipts
 - Read/sent message state
+- Unread new-message divider
 - Typing indicators
 - Conversation unread badges
 - Message history pagination on scroll

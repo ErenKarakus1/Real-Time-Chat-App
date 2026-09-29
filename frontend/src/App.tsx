@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -91,6 +92,10 @@ function App() {
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [messagesConversationID, setMessagesConversationID] = useState('')
+  const [unreadDivider, setUnreadDivider] = useState<{
+    conversationID: string
+    lastReadAt: string | null
+  } | null>(null)
   const [draftMessage, setDraftMessage] = useState('')
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false)
@@ -449,6 +454,31 @@ function App() {
     [participants, user?.id],
   )
 
+  const unreadDividerMessageID = useMemo(() => {
+    if (
+      !user ||
+      !unreadDivider ||
+      unreadDivider.conversationID !== selectedConversationID ||
+      messagesConversationID !== selectedConversationID
+    ) {
+      return ''
+    }
+
+    return (
+      messages.find((message) => {
+        if (message.sender_id === user.id) {
+          return false
+        }
+
+        return (
+          !unreadDivider.lastReadAt ||
+          new Date(message.created_at).getTime() >
+            new Date(unreadDivider.lastReadAt).getTime()
+        )
+      })?.id ?? ''
+    )
+  }, [messages, messagesConversationID, selectedConversationID, unreadDivider, user])
+
   const canManageRoom = currentParticipant?.role === 'owner'
   const canManageMembers =
     currentParticipant?.role === 'owner' || currentParticipant?.role === 'admin'
@@ -472,6 +502,19 @@ function App() {
       .then((items) => {
         if (isCurrent) {
           setParticipants(items)
+          setUnreadDivider((currentDivider) => {
+            if (currentDivider?.conversationID === selectedConversation.id) {
+              return currentDivider
+            }
+
+            const currentUserParticipant = items.find(
+              (participant) => participant.user_id === user?.id,
+            )
+            return {
+              conversationID: selectedConversation.id,
+              lastReadAt: currentUserParticipant?.last_read_at ?? null,
+            }
+          })
           setParticipantsByConversation((currentParticipants) => ({
             ...currentParticipants,
             [selectedConversation.id]: items,
@@ -496,7 +539,7 @@ function App() {
     return () => {
       isCurrent = false
     }
-  }, [token, selectedConversation])
+  }, [token, selectedConversation, user?.id])
 
   const handleRealtimeEvent = useCallback(
     (conversationID: string, realtimeEvent: RealtimeEvent) => {
@@ -766,6 +809,7 @@ function App() {
     setConversationSearch('')
     setMessages([])
     setMessagesConversationID('')
+    setUnreadDivider(null)
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -830,6 +874,13 @@ function App() {
 
     setMessages([])
     setMessagesConversationID('')
+    const cachedCurrentParticipant = participantsByConversation[conversation.id]?.find(
+      (participant) => participant.user_id === user?.id,
+    )
+    setUnreadDivider({
+      conversationID: conversation.id,
+      lastReadAt: cachedCurrentParticipant?.last_read_at ?? null,
+    })
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -853,17 +904,40 @@ function App() {
     stopTyping()
     setSelectedConversationID(conversation.id)
     if (token) {
-      markConversationRead(token, conversation.id)
-        .then(() => {
-          setConversations((currentConversations) =>
-            currentConversations.map((currentConversation) =>
-              currentConversation.id === conversation.id
-                ? { ...currentConversation, unread_count: 0 }
-                : currentConversation,
-            ),
+      const markRead = () =>
+        markConversationRead(token, conversation.id)
+          .then(() => {
+            setConversations((currentConversations) =>
+              currentConversations.map((currentConversation) =>
+                currentConversation.id === conversation.id
+                  ? { ...currentConversation, unread_count: 0 }
+                  : currentConversation,
+              ),
+            )
+          })
+          .catch(() => undefined)
+
+      listParticipants(token, conversation.id)
+        .then((items) => {
+          const currentUserParticipant = items.find(
+            (participant) => participant.user_id === user?.id,
           )
+          setUnreadDivider({
+            conversationID: conversation.id,
+            lastReadAt: currentUserParticipant?.last_read_at ?? null,
+          })
+          setParticipantsByConversation((currentParticipants) => ({
+            ...currentParticipants,
+            [conversation.id]: items,
+          }))
+          if (conversation.id === selectedConversationIDRef.current) {
+            setParticipants(items)
+          }
+          return markRead()
         })
-        .catch(() => undefined)
+        .catch(() => {
+          void markRead()
+        })
     }
   }
 
@@ -1063,6 +1137,7 @@ function App() {
       setSelectedConversationID(conversation.id)
       setMessages([])
       setMessagesConversationID('')
+      setUnreadDivider(null)
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1311,6 +1386,7 @@ function App() {
       setSelectedConversationID('')
       setMessages([])
       setMessagesConversationID('')
+      setUnreadDivider(null)
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1532,6 +1608,7 @@ function App() {
       setSelectedConversationID('')
       setMessages([])
       setMessagesConversationID('')
+      setUnreadDivider(null)
       setHasOlderMessages(false)
       setIsLoadingOlderMessages(false)
       setIsAtMessageEnd(true)
@@ -1949,66 +2026,72 @@ function App() {
                     const deliveryLabel = messageDeliveryLabel(message)
 
                     return (
-                      <article
-                        className="message-bubble"
-                        data-own={isOwnMessage}
-                        key={message.id}
-                      >
-                        {isEditingMessage ? (
-                          <form className="edit-message-form" onSubmit={handleUpdateMessage}>
-                            <input
-                              aria-label="Edit message"
-                              onChange={(event) => setEditingContent(event.target.value)}
-                              type="text"
-                              value={editingContent}
-                            />
-                            <div className="message-actions">
-                              <button
-                                disabled={isPendingMessage || !editingContent.trim()}
-                                type="submit"
-                              >
-                                Save
-                              </button>
-                              <button type="button" onClick={cancelEditingMessage}>
-                                Cancel
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <>
-                            <p>{message.content}</p>
-                            <div className="message-meta">
-                              <time dateTime={message.created_at}>
-                                {formatMessageTime(message.created_at)}
-                              </time>
-                              {message.updated_at !== message.created_at && (
-                                <span>Edited</span>
-                              )}
-                              {deliveryLabel && (
-                                <span className="delivery-status">{deliveryLabel}</span>
-                              )}
-                            </div>
-                            {isOwnMessage && (
+                      <Fragment key={message.id}>
+                        {message.id === unreadDividerMessageID && (
+                          <div className="unread-divider">
+                            <span>New messages</span>
+                          </div>
+                        )}
+                        <article
+                          className="message-bubble"
+                          data-own={isOwnMessage}
+                        >
+                          {isEditingMessage ? (
+                            <form className="edit-message-form" onSubmit={handleUpdateMessage}>
+                              <input
+                                aria-label="Edit message"
+                                onChange={(event) => setEditingContent(event.target.value)}
+                                type="text"
+                                value={editingContent}
+                              />
                               <div className="message-actions">
                                 <button
-                                  disabled={isPendingMessage}
-                                  type="button"
-                                  onClick={() => startEditingMessage(message)}
+                                  disabled={isPendingMessage || !editingContent.trim()}
+                                  type="submit"
                                 >
-                                  Edit
+                                  Save
                                 </button>
-                                <button
-                                  disabled={isPendingMessage}
-                                  type="button"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
+                                <button type="button" onClick={cancelEditingMessage}>
+                                  Cancel
                                 </button>
                               </div>
-                            )}
-                          </>
-                        )}
-                      </article>
+                            </form>
+                          ) : (
+                            <>
+                              <p>{message.content}</p>
+                              <div className="message-meta">
+                                <time dateTime={message.created_at}>
+                                  {formatMessageTime(message.created_at)}
+                                </time>
+                                {message.updated_at !== message.created_at && (
+                                  <span>Edited</span>
+                                )}
+                                {deliveryLabel && (
+                                  <span className="delivery-status">{deliveryLabel}</span>
+                                )}
+                              </div>
+                              {isOwnMessage && (
+                                <div className="message-actions">
+                                  <button
+                                    disabled={isPendingMessage}
+                                    type="button"
+                                    onClick={() => startEditingMessage(message)}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    disabled={isPendingMessage}
+                                    type="button"
+                                    onClick={() => handleDeleteMessage(message.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </article>
+                      </Fragment>
                     )
                     })}
                   </>

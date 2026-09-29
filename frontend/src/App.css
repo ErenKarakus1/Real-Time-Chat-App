@@ -633,6 +633,28 @@ button:hover:not(:disabled) {
   font-weight: 800;
 }
 
+.unread-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.unread-divider::before,
+.unread-divider::after {
+  content: '';
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 36%, var(--line));
+}
+
+.unread-divider span {
+  white-space: nowrap;
+}
+
 .message-bubble {
   width: fit-content;
   max-width: min(620px, 78%);
