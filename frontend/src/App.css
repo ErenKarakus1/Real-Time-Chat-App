@@ -724,6 +724,8 @@ button:hover:not(:disabled) {
 
 .message-meta .delivery-ticks {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 14px;
   color: #ffffff;
   font-size: 0.86rem;
@@ -738,10 +740,13 @@ button:hover:not(:disabled) {
 }
 
 .message-meta .delivery-status[data-status='read'] .delivery-ticks {
-  color: #075985;
-  text-shadow:
-    0 0 2px #ffffff,
-    0 1px 1px rgb(255 255 255 / 0.8);
+  min-width: 20px;
+  min-height: 16px;
+  border-radius: 999px;
+  padding: 1px 5px 1px 3px;
+  color: #ffffff;
+  background: #0f172a;
+  text-shadow: none;
 }
 
 .message-actions {
