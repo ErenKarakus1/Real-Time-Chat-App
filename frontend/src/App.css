@@ -707,15 +707,14 @@ button:hover:not(:disabled) {
 .message-meta .delivery-status {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   color: rgb(255 255 255 / 0.78);
   line-height: 1;
   font-weight: 800;
 }
 
 .message-meta .delivery-status[data-status='read'] {
-  color: #38bdf8;
-  text-shadow: 0 0 1px rgb(0 0 0 / 0.28);
+  color: #e0f2fe;
 }
 
 .message-meta .delivery-ticks,
@@ -725,12 +724,19 @@ button:hover:not(:disabled) {
 
 .message-meta .delivery-ticks {
   display: inline-flex;
-  min-width: 14px;
-  letter-spacing: -0.18em;
+  gap: 1px;
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 0.9;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
 }
 
-.message-meta .delivery-ticks span + span {
-  margin-left: -3px;
+.message-meta .delivery-status[data-status='read'] .delivery-ticks {
+  color: #0ea5e9;
+  text-shadow:
+    0 0 1px #ffffff,
+    0 1px 1px rgb(0 0 0 / 0.4);
 }
 
 .message-actions {
