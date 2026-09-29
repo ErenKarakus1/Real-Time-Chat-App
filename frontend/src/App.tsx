@@ -520,6 +520,10 @@ function App() {
               return currentDivider
             }
 
+            if (!selectedConversation.unread_count) {
+              return null
+            }
+
             const currentUserParticipant = items.find(
               (participant) => participant.user_id === user?.id,
             )
@@ -890,10 +894,14 @@ function App() {
     const cachedCurrentParticipant = participantsByConversation[conversation.id]?.find(
       (participant) => participant.user_id === user?.id,
     )
-    setUnreadDivider({
-      conversationID: conversation.id,
-      lastReadAt: cachedCurrentParticipant?.last_read_at ?? null,
-    })
+    setUnreadDivider(
+      conversation.unread_count
+        ? {
+            conversationID: conversation.id,
+            lastReadAt: cachedCurrentParticipant?.last_read_at ?? null,
+          }
+        : null,
+    )
     setHasOlderMessages(false)
     setIsLoadingOlderMessages(false)
     setIsAtMessageEnd(true)
@@ -935,10 +943,14 @@ function App() {
           const currentUserParticipant = items.find(
             (participant) => participant.user_id === user?.id,
           )
-          setUnreadDivider({
-            conversationID: conversation.id,
-            lastReadAt: currentUserParticipant?.last_read_at ?? null,
-          })
+          setUnreadDivider(
+            conversation.unread_count
+              ? {
+                  conversationID: conversation.id,
+                  lastReadAt: currentUserParticipant?.last_read_at ?? null,
+                }
+              : null,
+          )
           setParticipantsByConversation((currentParticipants) => ({
             ...currentParticipants,
             [conversation.id]: items,
