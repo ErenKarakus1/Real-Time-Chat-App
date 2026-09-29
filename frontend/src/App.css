@@ -619,7 +619,7 @@ button:hover:not(:disabled) {
   gap: 10px;
   overflow: auto;
   padding: 8px 6px 4px;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 .older-messages-status {
@@ -818,13 +818,14 @@ button:hover:not(:disabled) {
   }
 
   .app-shell {
-    height: auto;
+    height: 100svh;
     min-height: 100svh;
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, auto) minmax(0, 1fr);
   }
 
   .sidebar {
-    max-height: none;
+    max-height: 42svh;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }

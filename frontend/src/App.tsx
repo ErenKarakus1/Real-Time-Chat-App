@@ -334,16 +334,29 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
+      const selectedConversationUnreadCount =
+        conversations.find(
+          (conversation) => conversation.id === selectedConversationID,
+        )?.unread_count ?? 0
+      const shouldScrollToUnreadDivider = selectedConversationUnreadCount > 0
+      if (shouldScrollToUnreadDivider && !unreadDividerMessageID) {
+        return
+      }
+
       let secondFrame = 0
       const firstFrame = requestAnimationFrame(() => {
         secondFrame = requestAnimationFrame(() => {
-          const target = unreadDividerMessageID
+          const target = shouldScrollToUnreadDivider
             ? unreadDividerRef.current
             : messageEndRef.current
 
-          target?.scrollIntoView({
+          if (!target) {
+            return
+          }
+
+          target.scrollIntoView({
             behavior: 'auto',
-            block: unreadDividerMessageID ? 'start' : 'end',
+            block: shouldScrollToUnreadDivider ? 'start' : 'end',
           })
 
           setIsAtMessageEnd(
@@ -358,7 +371,13 @@ function App() {
         cancelAnimationFrame(secondFrame)
       }
     }
-  }, [messages, messagesConversationID, selectedConversationID, unreadDividerMessageID])
+  }, [
+    messages,
+    messagesConversationID,
+    conversations,
+    selectedConversationID,
+    unreadDividerMessageID,
+  ])
 
   useEffect(() => {
     if (!token || directSearch.trim().length < 2) {
