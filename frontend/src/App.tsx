@@ -136,6 +136,7 @@ function App() {
   const unreadDividerRef = useRef<HTMLDivElement | null>(null)
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottomRef = useRef(true)
+  const forceScrollToBottomRef = useRef(false)
   const restoreMessageScrollRef = useRef<{
     scrollHeight: number
     scrollTop: number
@@ -334,7 +335,8 @@ function App() {
     }
 
     if (shouldScrollToBottomRef.current) {
-      const shouldScrollToUnreadDivider = Boolean(unreadDividerMessageID)
+      const shouldScrollToUnreadDivider =
+        Boolean(unreadDividerMessageID) && !forceScrollToBottomRef.current
 
       let secondFrame = 0
       const firstFrame = requestAnimationFrame(() => {
@@ -355,6 +357,7 @@ function App() {
           setIsAtMessageEnd(
             messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 48,
           )
+          forceScrollToBottomRef.current = false
           shouldScrollToBottomRef.current = false
         })
       })
@@ -1071,8 +1074,11 @@ function App() {
     return `${names[0]} and ${names.length - 1} others are typing`
   }
 
-  function addMessage(message: Message) {
+  function addMessage(message: Message, options: { forceBottom?: boolean } = {}) {
     shouldScrollToBottomRef.current = true
+    if (options.forceBottom) {
+      forceScrollToBottomRef.current = true
+    }
     setMessages((currentMessages) => {
       if (currentMessages.some((currentMessage) => currentMessage.id === message.id)) {
         return currentMessages
@@ -1227,7 +1233,7 @@ function App() {
 
     try {
       const message = await createMessage(token, selectedConversationID, { content })
-      addMessage(message)
+      addMessage(message, { forceBottom: true })
       setDraftMessage('')
       stopTyping()
     } catch (caughtError) {
