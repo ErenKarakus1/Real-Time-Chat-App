@@ -42,6 +42,7 @@ import {
 
 const TOKEN_KEY = 'rtc_token'
 const MESSAGE_PAGE_SIZE = 30
+const MAX_MESSAGE_LENGTH = 2000
 
 type AuthMode = 'login' | 'register'
 
@@ -167,6 +168,28 @@ function App() {
     setIsAtMessageEnd(isAtEnd)
     isAtMessageEndRef.current = isAtEnd
   }, [])
+
+  const retryScrollToMessageEnd = useCallback(() => {
+    const messageList = messageListRef.current
+    if (!messageList) {
+      return
+    }
+
+    scrollMessageListToBottom(messageList)
+    requestAnimationFrame(() => {
+      if (messageListRef.current) {
+        scrollMessageListToBottom(messageListRef.current)
+      }
+    })
+    window.setTimeout(() => {
+      if (messageListRef.current) {
+        scrollMessageListToBottom(messageListRef.current)
+      }
+    }, 80)
+  }, [scrollMessageListToBottom])
+
+  const draftMessageLength = draftMessage.trim().length
+  const editingContentLength = editingContent.trim().length
 
   const unreadDividerMessageID = useMemo(() => {
     if (
@@ -1262,6 +1285,10 @@ function App() {
     if (!content) {
       return
     }
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      setMessageError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`)
+      return
+    }
 
     setIsSendingMessage(true)
     setMessageError('')
@@ -1269,6 +1296,7 @@ function App() {
     try {
       const message = await createMessage(token, selectedConversationID, { content })
       addMessage(message, { forceBottom: true })
+      retryScrollToMessageEnd()
       setDraftMessage('')
       stopTyping()
     } catch (caughtError) {
@@ -1301,6 +1329,15 @@ function App() {
   }
 
   function handleDraftMessageChange(value: string) {
+    if (value.length > MAX_MESSAGE_LENGTH) {
+      setMessageError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`)
+      return
+    }
+
+    if (messageError.startsWith('Message must be ')) {
+      setMessageError('')
+    }
+
     setDraftMessage(value)
 
     if (!value.trim()) {
@@ -1318,10 +1355,22 @@ function App() {
   }
 
   function formatMessageTime(value: string) {
+    const messageDate = new Date(value)
+    const now = new Date()
+    const isSameYear = messageDate.getFullYear() === now.getFullYear()
+    const isSameDay = messageDate.toDateString() === now.toDateString()
+
     return new Intl.DateTimeFormat(undefined, {
+      ...(isSameDay
+        ? {}
+        : {
+            day: 'numeric',
+            month: 'short',
+            ...(isSameYear ? {} : { year: 'numeric' }),
+          }),
       hour: '2-digit',
       minute: '2-digit',
-    }).format(new Date(value))
+    }).format(messageDate)
   }
 
   function messageDeliveryStatus(message: Message): 'sent' | 'read' | '' {
@@ -1359,6 +1408,10 @@ function App() {
 
     const content = editingContent.trim()
     if (!content) {
+      return
+    }
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      setMessageError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`)
       return
     }
 
@@ -2124,13 +2177,18 @@ function App() {
                             <form className="edit-message-form" onSubmit={handleUpdateMessage}>
                               <input
                                 aria-label="Edit message"
+                                maxLength={MAX_MESSAGE_LENGTH}
                                 onChange={(event) => setEditingContent(event.target.value)}
                                 type="text"
                                 value={editingContent}
                               />
                               <div className="message-actions">
                                 <button
-                                  disabled={isPendingMessage || !editingContent.trim()}
+                                  disabled={
+                                    isPendingMessage ||
+                                    !editingContentLength ||
+                                    editingContentLength > MAX_MESSAGE_LENGTH
+                                  }
                                   type="submit"
                                 >
                                   Save
@@ -2215,6 +2273,7 @@ function App() {
               <form className="composer" onSubmit={handleSendMessage}>
                 <input
                   aria-label="Message"
+                  maxLength={MAX_MESSAGE_LENGTH}
                   onChange={(event) => handleDraftMessageChange(event.target.value)}
                   placeholder="Write a message"
                   type="text"
@@ -2222,7 +2281,11 @@ function App() {
                 />
                 <button
                   className="primary-button"
-                  disabled={isSendingMessage || !draftMessage.trim()}
+                  disabled={
+                    isSendingMessage ||
+                    !draftMessageLength ||
+                    draftMessageLength > MAX_MESSAGE_LENGTH
+                  }
                   type="submit"
                 >
                   {isSendingMessage ? 'Sending' : 'Send'}

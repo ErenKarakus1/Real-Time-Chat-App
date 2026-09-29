@@ -86,8 +86,8 @@ func TestMessageServiceCreateValidatesAndTrimsContent(t *testing.T) {
 	if _, err := service.Create(context.Background(), CreateMessageInput{ConversationID: conversationID, SenderID: userID, Content: "   "}); !errors.Is(err, ErrInvalidMessageContent) {
 		t.Fatalf("blank content error = %v, want %v", err, ErrInvalidMessageContent)
 	}
-	if _, err := service.Create(context.Background(), CreateMessageInput{ConversationID: conversationID, SenderID: userID, Content: strings.Repeat("a", MaxMessageLength+1)}); !errors.Is(err, ErrInvalidMessageContent) {
-		t.Fatalf("long content error = %v, want %v", err, ErrInvalidMessageContent)
+	if _, err := service.Create(context.Background(), CreateMessageInput{ConversationID: conversationID, SenderID: userID, Content: strings.Repeat("a", MaxMessageLength+1)}); !errors.Is(err, ErrMessageContentTooLong) {
+		t.Fatalf("long content error = %v, want %v", err, ErrMessageContentTooLong)
 	}
 	if _, err := service.Create(context.Background(), CreateMessageInput{ConversationID: conversationID, SenderID: userID, Content: " hello "}); err != nil {
 		t.Fatalf("create message: %v", err)

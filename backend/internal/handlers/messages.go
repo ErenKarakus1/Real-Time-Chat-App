@@ -80,6 +80,10 @@ func (h *MessageHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, services.ErrMessageContentTooLong) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 		return
@@ -183,6 +187,10 @@ func (h *MessageHandler) Update(c *gin.Context) {
 		return
 	}
 	if errors.Is(err, services.ErrInvalidMessageContent) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, services.ErrMessageContentTooLong) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

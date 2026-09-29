@@ -18,6 +18,7 @@ const (
 
 var ErrConversationAccessDenied = errors.New("user is not a participant in this conversation")
 var ErrInvalidMessageContent = errors.New("message content is required")
+var ErrMessageContentTooLong = errors.New("message content must be 2000 characters or fewer")
 var ErrMessageOwnershipDenied = errors.New("user can only manage their own messages")
 
 type MessageRepository interface {
@@ -80,7 +81,7 @@ func (s *MessageService) Create(ctx context.Context, input CreateMessageInput) (
 		return models.Message{}, ErrInvalidMessageContent
 	}
 	if len(content) > MaxMessageLength {
-		return models.Message{}, ErrInvalidMessageContent
+		return models.Message{}, ErrMessageContentTooLong
 	}
 
 	message := models.Message{
@@ -132,7 +133,7 @@ func (s *MessageService) Update(ctx context.Context, input UpdateMessageInput) (
 		return models.Message{}, ErrInvalidMessageContent
 	}
 	if len(content) > MaxMessageLength {
-		return models.Message{}, ErrInvalidMessageContent
+		return models.Message{}, ErrMessageContentTooLong
 	}
 
 	return s.messages.UpdateContent(ctx, input.MessageID, content)
