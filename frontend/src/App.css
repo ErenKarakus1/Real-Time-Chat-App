@@ -707,23 +707,29 @@ button:hover:not(:disabled) {
 .message-meta .delivery-status {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  min-width: 16px;
+  gap: 4px;
   color: rgb(255 255 255 / 0.78);
-  letter-spacing: -0.18em;
   line-height: 1;
   font-weight: 800;
 }
 
 .message-meta .delivery-status[data-status='read'] {
-  color: #7dd3fc;
+  color: #38bdf8;
+  text-shadow: 0 0 1px rgb(0 0 0 / 0.28);
 }
 
-.message-meta .delivery-status span {
+.message-meta .delivery-ticks,
+.message-meta .delivery-label {
   color: inherit;
 }
 
-.message-meta .delivery-status span + span {
+.message-meta .delivery-ticks {
+  display: inline-flex;
+  min-width: 14px;
+  letter-spacing: -0.18em;
+}
+
+.message-meta .delivery-ticks span + span {
   margin-left: -3px;
 }
 

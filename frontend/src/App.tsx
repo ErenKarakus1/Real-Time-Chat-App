@@ -2116,10 +2116,13 @@ function App() {
                                     aria-label={deliveryStatus === 'read' ? 'Read' : 'Sent'}
                                     title={deliveryStatus === 'read' ? 'Read' : 'Sent'}
                                   >
-                                    <span aria-hidden="true">✓</span>
-                                    {deliveryStatus === 'read' && (
-                                      <span aria-hidden="true">✓</span>
-                                    )}
+                                    <span className="delivery-ticks" aria-hidden="true">
+                                      <span>✓</span>
+                                      {deliveryStatus === 'read' && <span>✓</span>}
+                                    </span>
+                                    <span className="delivery-label">
+                                      {deliveryStatus === 'read' ? 'Read' : 'Sent'}
+                                    </span>
                                   </span>
                                 )}
                               </div>
