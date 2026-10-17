@@ -64,6 +64,40 @@ A full-stack real-time chat application built with **Go Gin**, **React**, **Post
 - Redis-backed rate limiting
 - Dockerized local environment
 
+## Architecture
+
+```mermaid
+flowchart LR
+    client["Browser: React + Vite + TypeScript"]
+
+    subgraph backend["Go Gin Backend"]
+        api["REST API + JWT authentication + rate limiting"]
+        services["Services: validation and permissions"]
+        repositories["Repositories: pgx"]
+        websocket["WebSocket handler + realtime hub"]
+        presence["Presence tracking"]
+    end
+
+    postgres[("PostgreSQL")]
+    redis[("Redis")]
+    migrate["Migration runner"]
+
+    client <-->|"HTTP / JSON"| api
+    api --> services
+    services --> repositories
+    repositories <-->|"Users, conversations, participants, messages"| postgres
+    api <-->|"Rate limit counters"| redis
+    api -->|"Publish message and read events"| websocket
+    client <-->|"WebSocket: live events and typing"| websocket
+    websocket <-->|"Conversation Pub/Sub"| redis
+    websocket --> presence
+    api -->|"Query online status"| presence
+    presence <-->|"Active connections"| redis
+    migrate -->|"Apply schema migrations"| postgres
+```
+
+Messages are created, edited, and deleted through the REST API and stored in PostgreSQL. After a successful change, the backend publishes an event through Redis Pub/Sub, and the realtime hub forwards it to connected WebSocket clients. Redis also tracks presence and rate limits. Docker Compose runs migrations before starting the backend.
+
 ## Project Structure
 
 ```text
