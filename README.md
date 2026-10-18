@@ -156,7 +156,13 @@ GET http://localhost:8080/health
 
 ## Run Locally
 
-Start PostgreSQL and Redis first.
+Prerequisites: Go 1.26.5, Node.js 22.12+ (or 24+), npm, PostgreSQL 17, and Redis 8. The Docker frontend uses Node.js 22.
+
+Run the following setup commands from the repository root. Start PostgreSQL and Redis first, and create the `real_time_chat` database. You can also start only the bundled data services:
+
+```sh
+docker compose up -d postgres redis
+```
 
 Create a backend environment file:
 
@@ -171,19 +177,21 @@ cd backend
 go run ./cmd/migrate
 ```
 
-Start the backend:
+Start the backend from the same `backend` directory:
 
 ```sh
 go run ./cmd/server
 ```
 
-Start the frontend:
+In a separate terminal, start the frontend from the repository root:
 
 ```sh
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
+
+Open http://localhost:5173. The backend loads `backend/.env` when started from the `backend` directory.
 
 ## Environment Variables
 
@@ -196,6 +204,12 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/real_time_chat?sslmode=
 REDIS_URL=redis://localhost:6379/0
 JWT_SECRET=change-me
 CORS_ALLOWED_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
+```
+
+The frontend defaults to `http://localhost:8080` for API requests and derives its WebSocket URL from that address. To use another backend, set `VITE_API_BASE_URL` in `frontend/.env.local` and restart Vite:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080
 ```
 
 ## API Overview
@@ -252,6 +266,8 @@ Message listing supports pagination:
 GET /conversations/:conversation_id/messages?before=2026-09-27T10:00:00Z&limit=30
 ```
 
+The API returns each page oldest-to-newest. The default page size is 50 and the maximum is 100; the frontend requests 30 messages at a time.
+
 ### WebSocket
 
 ```text
@@ -305,6 +321,9 @@ docker compose config --quiet
 
 - Register returns the created user.
 - Login returns the user and JWT.
+- JWTs expire after 8 hours; users must log in again after expiration.
+- Own messages show a single tick with Sent or double ticks with Read. In rooms, Read currently means at least one other participant has marked the conversation read.
+- Messages from today show the time; older messages include the date, and messages from a previous year also include the year. Formatting uses the browser's locale and time zone.
 - Room owners can rename/delete rooms, manage roles, and transfer ownership.
 - Admins can add members and remove members.
 - Members can leave rooms.
@@ -318,7 +337,8 @@ docker compose config --quiet
 - Message reactions are not supported.
 - Message search is not implemented.
 - Presence is based on active WebSocket connections.
-- The frontend currently keeps one WebSocket connection per visible conversation.
+- The frontend keeps one WebSocket connection per conversation in the currently loaded conversation list, including inactive chats. Filtering that list also changes which conversations receive live updates.
+- Message length validation differs between layers: inputs allow 2000 UTF-16 code units, while the backend limits trimmed content to 2000 UTF-8 bytes. Emoji and other non-ASCII text can reach the backend limit sooner.
 - Room membership changes are not broadcast as realtime room events yet.
 - The app is optimized for local development, not production deployment hardening.
 
